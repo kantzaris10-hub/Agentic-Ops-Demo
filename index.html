@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Interactive portfolio demo of a human-controlled product operations platform.">
+  <title>Product Ops Demo — Forge-inspired workflow</title>
+  <link rel="stylesheet" href="./style.css?v=16">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><b>F</b><div><strong>Product Ops Demo</strong><small>FORGE-INSPIRED · SYNTHETIC DATA</small></div></div>
+    <nav id="nav">
+      <button class="nav active" data-view="architecture"><span>Architecture</span></button>
+      <button class="nav" data-view="overview"><span>About</span></button>
+      <button class="nav" data-view="workspace"><span>7 · EDIT</span></button>
+      <button class="nav" data-view="images"><span>1 · IMG</span></button>
+      <button class="nav" data-view="content"><span>2 · CMS</span></button>
+      <button class="nav" data-view="properties"><span>3 · Properties</span></button>
+      <button class="nav" data-view="compatibility"><span>5 · Compat.</span></button>
+      <button class="nav" data-view="batch"><span>Inputs</span></button>
+      <button class="nav" data-view="auditor"><span>BO Auditor</span></button>
+      <button class="nav" data-view="history"><span>History</span></button>
+      <button class="nav" data-view="backoffice"><span>6 · BO Bind</span></button>
+    </nav>
+    <div class="environment"><i></i><div><strong>Demo environment</strong><small>Synthetic data · no APIs</small></div></div>
+  </aside>
+
+  <main>
+    <header><div><p>PRODUCT WORKFLOW ASSISTANT · PUBLIC DEMO</p><h1 id="viewTitle">System architecture</h1></div><div class="header-actions"><span>Synthetic data only</span><button id="resetDemo" title="Reset demo state">↺</button><button id="theme">◐</button></div></header>
+    <div class="disclaimer"><strong>Independent implementation.</strong> Interface and safety architecture only — no employer code, internal data, credentials or endpoints.</div>
+
+    <section id="overview" class="view">
+      <div class="landing">
+        <div class="landing-copy">
+          <p class="overline">INTERACTIVE SYSTEM DEMO</p>
+          <h2>Human-controlled automation for high-volume product operations.</h2>
+          <p class="landing-lede">A portfolio reconstruction of the workflow patterns behind an internal product-operations tool: batch preparation, deterministic validation, explicit approval, controlled writes and post-write verification.</p>
+          <div class="landing-actions"><button id="startTour" class="accent primary-action">Start 90-second walkthrough</button><button id="openWorkspace">Explore freely</button></div>
+          <div class="built-note"><strong>What I built</strong><span>Workflow design, operational UI, validation rules, approval boundaries, batch controls, verification and audit patterns.</span></div>
+        </div>
+        <aside class="impact-card">
+          <p>WHY IT EXISTS</p><h3>Scale operations without removing judgment.</h3>
+          <div><strong>24</strong><span>items in a demo batch</span></div><div><strong>6</strong><span>content languages</span></div><div><strong>0</strong><span>unapproved writes</span></div>
+          <small>All figures and records in this public version are synthetic.</small>
+        </aside>
+      </div>
+      <div class="principles"><article><span>01</span><strong>Propose ≠ execute</strong><p>The decision layer cannot mutate operational state.</p></article><article><span>02</span><strong>Rules outside the agent</strong><p>Typed schemas and allowlists enforce hard boundaries.</p></article><article><span>03</span><strong>Human approval</strong><p>Execution requires an explicit operator decision.</p></article><article><span>04</span><strong>Verify after writing</strong><p>The final state is re-read and compared with intent.</p></article></div>
+      <article class="card system-map"><div class="card-head"><div><p>ONE COMPLETE RUN</p><h2>From evidence to verified state</h2></div><button id="overviewArchitecture">View architecture</button></div><div class="mini-flow"><span>Product evidence</span><i>→</i><span>Structured proposal</span><i>→</i><span>Policy checks</span><i>→</i><span>Human gate</span><i>→</i><span>Controlled write</span><i>→</i><span>Verified result</span></div></article>
+    </section>
+
+    <section id="workspace" class="view">
+      <div class="metrics">
+        <article><span>QUEUE</span><strong id="metricQueue">24</strong><small>products ready</small></article>
+        <article><span>COMPLETED TODAY</span><strong id="metricCompleted">148</strong><small class="green">↑ 32% vs baseline</small></article>
+        <article><span>VALIDATION</span><strong id="metricValidation">96.8%</strong><small>first-pass rate</small></article>
+        <article><span>REQUIRES REVIEW</span><strong id="metricReview">3</strong><small class="amber">human decision</small></article>
+      </div>
+      <article class="card workflow-intake">
+        <div class="card-head"><div><p>00 · PRODUCT INTAKE</p><h2>Read product → classify workflow</h2></div><span id="intakeState" class="pill neutral">AWAITING CODE</span></div>
+        <div class="intake-layout"><div><div class="intake-controls"><input id="productLookup" placeholder="Enter a demo code, e.g. DEMO-1846"><button id="lookupProduct" class="accent">Read product</button></div><div class="sample-actions"><button class="lookup-sample" data-sku="DEMO-1846">Oil sample</button><button class="lookup-sample" data-sku="DEMO-2207">Cabin sample</button><button class="lookup-sample" data-sku="DEMO-3118">Conflict sample</button></div><div id="intakeEvidence" class="evidence-note">The public demo uses a synthetic, read-only catalog adapter. No ERP or Back Office is queried.</div></div><div id="intakeRecord" class="intake-record empty">Enter a product code to inspect the input record.</div><div id="workflowRoute" class="workflow-route empty">A route appears only after the product is read and classified.</div></div>
+      </article>
+      <div class="columns">
+        <article class="card">
+          <div class="card-head"><div><p>ACTIVE QUEUE</p><h2>Product worklist</h2></div><div><button>Filter</button><button class="accent" id="buildBatch">Build proposal</button></div></div>
+          <div class="filters"><input id="search" placeholder="Search SKU, brand or title…"><select id="statusFilter"><option value="all">All statuses</option><option>Ready</option><option>Review</option><option>Blocked</option></select></div>
+          <div class="table"><table><thead><tr><th>Product</th><th>Workflow</th><th>Checks</th><th>Status</th></tr></thead><tbody id="productRows"></tbody></table></div>
+        </article>
+        <aside class="card inspector">
+          <div class="card-head"><div><p>INSPECTOR</p><h2 id="inspectSku">Select a product</h2></div><span id="inspectStatus" class="pill neutral">IDLE</span></div>
+          <div id="inspectBody" class="empty">Choose a work item to inspect its operational state.</div>
+        </aside>
+      </div>
+      <article class="card activity-card">
+        <div class="card-head"><div><p>LIVE TRACE</p><h2>Execution activity</h2></div><code>session_demo_0929</code></div>
+        <div id="activity" class="activity">
+          <div><time>12:42:06</time><b class="green">VERIFIED</b><span>DEMO-1042 matched approved state after controlled write.</span></div>
+          <div><time>12:41:58</time><b class="blue">APPROVED</b><span>Operator approved four proposed field changes.</span></div>
+          <div><time>12:41:52</time><b>VALIDATED</b><span>Deterministic policy checks passed.</span></div>
+        </div>
+      </article>
+    </section>
+
+    <section id="images" class="view">
+      <div class="split">
+        <article class="card">
+          <div class="card-head"><div><p>01 · IMAGE PIPELINE</p><h2>Asset workspace</h2></div><button class="accent action" data-message="Synthetic folder imported">Import folder</button></div>
+          <div class="drop" id="imageDrop"><b>▧</b><strong>Drop product images here</strong><small>Click to simulate import. Square-fit, background and filename checks run before upload.</small></div>
+          <div class="image-pipeline"><div><span>01</span><strong>Source lookup</strong><small id="sourceState">Awaiting SKU</small></div><i>→</i><div><span>02</span><strong>Source candidates</strong><small id="scrapeState">0 candidates</small></div><i>→</i><div><span>03</span><strong>Quality filters</strong><small id="filterState">Not run</small></div><i>→</i><div><span>04</span><strong>Prepare upload</strong><small id="uploadState">Not staged</small></div></div>
+          <div class="image-actions"><button id="findImages">Search live source</button><button id="processImages">Prepare selected</button><button id="stageImages" class="accent">Stage image upload</button></div>
+          <div class="module-context" id="imageContext">Working product · select an item from the queue</div>
+          <div class="image-grid" id="imageGrid"></div>
+        </article>
+        <article class="card"><div class="card-head"><div><p>QUALITY GATE</p><h2>Image checks</h2></div><span id="imageCheckStatus" class="pill neutral">NOT RUN</span></div><ul id="imageChecks" class="checks"></ul><div id="imageEvidence" class="evidence-note">Run source lookup to inspect synthetic candidate evidence.</div><button id="prepareImageProposal" class="accent wide">Prepare upload proposal</button></article>
+      </div>
+      <article class="card image-workbench">
+        <div class="card-head"><div><p>01A · IMAGE WORKBENCH</p><h2>Manual framing and edge cleanup</h2></div><span id="workbenchState" class="pill neutral">SOURCE REQUIRED</span></div>
+        <div class="workbench-layout">
+          <div class="workbench-preview"><div id="workbenchEmpty">Choose a live candidate, then prepare a preview.</div><img id="workbenchPreview" alt="Prepared square output preview"></div>
+          <div class="workbench-controls"><label>Subject padding <output id="paddingValue">8%</output><input id="subjectPadding" type="range" min="0" max="24" value="8"></label><label>Edge cleanup threshold <output id="thresholdValue">24</output><input id="edgeThreshold" type="range" min="8" max="72" value="24"></label><label class="check-label"><input id="edgeCleanup" type="checkbox"> Replace edge-connected near-white background</label><div class="workbench-actions"><button id="applyImageEdits" class="accent">Render preview</button><button id="undoImageEdits" disabled>Undo</button></div><div id="workbenchNote" class="evidence-note">The frame is centered and operator-controlled. No AI subject detection or detail generation is claimed.</div></div>
+          <div class="output-order"><div><p>OUTPUT ORDER</p><h3>Upload set</h3></div><div id="imageOrder"></div><div class="order-actions"><button id="makeMain">Set selected as main</button><button id="moveImageEarlier">Move earlier</button><button id="moveImageLater">Move later</button></div></div>
+        </div>
+      </article>
+    </section>
+
+    <section id="content" class="view">
+      <article class="card template-generator">
+        <div class="card-head"><div><p>02A · TEMPLATE GENERATOR</p><h2>Evidence → structured copy variables</h2></div><span id="templateState" class="pill neutral">RAW INPUT</span></div>
+        <div class="template-layout">
+          <div class="template-source"><span>SYNTHETIC SOURCE TITLE</span><strong id="templateSource">Select a product</strong><small>Parser output is visible before it becomes a content variable.</small></div>
+          <div id="templateFields" class="template-fields"></div>
+          <div class="template-actions"><button id="extractFields">Extract fields</button><button id="generateLocales" class="accent" disabled>Generate 6 drafts</button></div>
+        </div>
+        <div id="templateEvidence" class="evidence-note">No parser result yet. Extraction uses transparent rules over synthetic source text; it does not invent missing OEM references.</div>
+      </article>
+      <div class="split">
+        <article class="card">
+          <div class="card-head"><div><p>02 · CMS</p><h2>Multilingual content editor</h2></div><div class="languages"><button class="active" data-language="EN">EN</button><button data-language="DE">DE</button><button data-language="FR">FR</button><button data-language="IT">IT</button><button data-language="ES">ES</button><button data-language="GR">GR</button></div></div>
+          <div id="contentContext" class="module-context">Working product</div><div id="localeProgress" class="locale-progress"></div>
+          <div class="form"><label class="full">Product title<input id="contentTitle"></label><label>Subtitle<input id="contentSubtitle"></label><label>Category<select id="contentCategory"><option>Vehicle Parts › Filters › Air Filters</option></select></label><label class="full">Description<textarea id="contentDescription"></textarea></label><label class="full">Article<textarea id="contentArticle" class="code"></textarea></label></div>
+        </article>
+        <article class="card"><div class="card-head"><div><p>CONTENT CHECKS</p><h2>Policy report</h2></div><span id="contentPolicy" class="pill neutral">DRAFT</span></div><ul id="contentChecks" class="checks"></ul><div id="contentLanguageState" class="evidence-note"></div><button id="stageContent" class="accent wide">Stage changes</button></article>
+      </div>
+    </section>
+
+    <section id="properties" class="view">
+      <article class="card"><div class="card-head"><div><p>03 · STRUCTURED DATA</p><h2>Product properties</h2></div><div><span id="propertyStatus" class="pill neutral">AWAITING REVIEW</span><button id="normalizeProperties">Normalize</button></div></div><div id="propertyContext" class="module-context">Working product</div><div id="propertyGrid" class="property-grid"></div><div id="propertyEvidence" class="callout"><strong>Deterministic mapping</strong><span>Normalized values come from evidence; unknown values stop for review instead of being guessed.</span></div></article>
+    </section>
+
+    <section id="compatibility" class="view">
+      <div class="split">
+        <article class="card"><div class="card-head"><div><p>04 · FITMENT</p><h2>Compatibility matcher</h2></div><button id="refreshCompat">Refresh candidates</button></div><div id="compatEvidence" class="evidence"></div><div class="table"><table><thead><tr><th>Decision</th><th>Make / model</th><th>Engine</th><th>Years</th><th>Confidence</th></tr></thead><tbody id="compatRows"></tbody></table></div></article>
+        <article class="card"><div class="card-head"><div><p>SAFETY</p><h2>Review summary</h2></div></div><div class="count green-border"><strong id="compatSafe">9</strong><span>auto-approved candidates</span></div><div class="count amber-border"><strong id="compatReview">3</strong><span>require human evidence</span></div><button id="stageCompat" class="accent wide">Stage approved only</button></article>
+      </div>
+    </section>
+
+    <section id="batch" class="view">
+      <article class="card import-card">
+        <div class="card-head"><div><p>00 · JSON INTAKE</p><h2>Versioned batch import</h2></div><span id="importState" class="pill neutral">NO IMPORT</span></div>
+        <div class="import-layout">
+          <div><div class="sample-actions"><button id="loadReadyJson">Load ready JSON</button><button id="loadMixedJson">Load mixed JSON</button><button id="clearJson">Clear</button></div><textarea id="batchJson" class="json-editor" spellcheck="false" placeholder="Paste a forge-ops-import/v1 dry-run payload…"></textarea><div class="import-actions"><button id="validateJson">Validate schema</button><button id="loadValidQueue" class="accent" disabled>Load valid queue</button></div></div>
+          <div><div class="import-contract"><strong>forge-ops-import/v1</strong><span>Required: schemaVersion, run.name, run.mode = dry-run, items[].sku, allowlisted operations.</span></div><div id="importSummary" class="import-summary empty">Load a sample or paste JSON to inspect its import report.</div></div>
+        </div>
+      </article>
+      <article class="card forge-preview" id="forgePreview" hidden>
+        <div class="card-head"><div><p>BEFORE EXECUTION</p><h2>Product preview</h2></div><span id="previewPosition" class="pill neutral"></span></div>
+        <div class="preview-toolbar"><div id="previewPills" class="preview-pills" role="group" aria-label="Select product to preview"></div><button id="previewRun" class="accent">Approve &amp; run selected</button></div>
+        <div id="previewDetails" class="preview-details"></div>
+        <p class="preview-note">Review the loaded JSON before approval. Execution stages operations in the simulated demo; the production Forge screenshots are documented separately.</p>
+      </article>
+      <div class="split">
+        <article class="card"><div class="card-head"><div><p>CONTROL PLANE</p><h2>Batch execution</h2></div><span id="batchState" class="pill neutral">READY</span></div><div class="stepper"><div class="done"><b>1</b><strong>Import</strong><small>typed plan</small></div><div class="done"><b>2</b><strong>Validate</strong><small>schema + queue</small></div><div><b>3</b><strong>Approve</strong><small>operator gate</small></div><div><b>4</b><strong>Execute</strong><small>per operation</small></div><div><b>5</b><strong>Verify</strong><small>row result</small></div></div><div id="batchList" class="batch-list"></div><div class="batch-run-controls"><button id="pauseBatch" disabled>Pause</button><button id="retryBatch" disabled>Retry failed only</button></div><div class="right-actions"><button id="rejectBatch">Reject proposal</button><button id="approveBatch" class="accent">Approve 21 safe writes</button></div></article>
+        <article class="card"><div class="card-head"><div><p>RUN POLICY</p><h2>Execution guard</h2></div></div><dl class="policy"><div><dt>Allowed fields</dt><dd>Title, description, category, readiness</dd></div><div><dt>Approval</dt><dd>Required at execution time</dd></div><div><dt>On ambiguity</dt><dd>Stop and report</dd></div><div><dt>After write</dt><dd>Re-read and compare</dd></div></dl></article>
+      </div>
+    </section>
+
+    <section id="auditor" class="view">
+      <div class="metrics"><article><span>SCANNED</span><strong id="auditScanned">0</strong><small>current synthetic queue</small></article><article><span>PASS</span><strong id="auditPass">0</strong><small class="green">no action required</small></article><article><span>REVIEW</span><strong id="auditReview">0</strong><small class="amber">fix can be proposed</small></article><article><span>BLOCKED</span><strong id="auditBlocked">0</strong><small>insufficient evidence</small></article></div>
+      <div class="split audit-split">
+        <article class="card"><div class="card-head"><div><p>READ-ONLY QUALITY SCAN</p><h2>Audit report</h2></div><button id="runAudit" class="accent">Run scan</button></div><div id="auditRunMeta" class="evidence-note">No scan has been run in this session.</div><div id="findings" class="findings"></div></article>
+        <aside class="card audit-inspector"><div class="card-head"><div><p>FIX WORKBENCH</p><h2 id="auditSku">Select a finding</h2></div><span id="auditStatus" class="pill neutral">IDLE</span></div><div id="auditDetail" class="empty">Run the read-only scan, then inspect one finding. A fix is proposed only for allowlisted fields with enough evidence.</div><button id="prepareFix" class="accent wide" disabled>Prepare controlled fix</button></aside>
+      </div>
+      <article class="card verify-loop"><div class="card-head"><div><p>CONTROL LOOP</p><h2>Evidence stays attached to the correction</h2></div></div><div><span>01 · Scan current state</span><i>→</i><span>02 · Inspect a finding</span><i>→</i><span>03 · Propose allowed fix</span><i>→</i><span>04 · Human approval</span><i>→</i><span>05 · Re-read and verify</span></div></article>
+    </section>
+
+    <section id="architecture" class="view active">
+      <article class="card architecture">
+        <div class="card-head"><div><p>FORGE IMPLEMENTATION REFERENCE</p><h2>Components, execution paths and failure modes</h2></div><span class="pill neutral">11 WORKFLOWS</span></div>
+        <div id="architectureExplorer">Loading implementation map…</div>
+      </article>
+    </section>
+
+      <section id="history" class="view">
+        <article class="card"><div class="card-head"><div><p>SESSION RECORD</p><h2>Run history</h2></div><button id="clearHistory">Clear session</button></div><div id="historyList" class="history-list"></div></article>
+      </section>
+
+      <section id="backoffice" class="view">
+        <div class="bo-header"><div><p>SIMULATED BACK OFFICE · READ / WRITE / VERIFY</p><h2 id="boTitle">No product selected</h2><span id="boSubtitle">Select a product from the operations workspace.</span></div><div><span id="boConnection" class="pill neutral">OFFLINE</span><button id="boLoad">Load product</button></div></div>
+        <div class="bo-grid">
+          <article class="card bo-record"><div class="card-head"><div><p>PRODUCT RECORD</p><h2>Current state</h2></div><span id="boReadState" class="pill neutral">NOT READ</span></div><div id="boFields" class="bo-fields empty">No record loaded.</div></article>
+          <article class="card"><div class="card-head"><div><p>ALLOWED TOOL CALLS</p><h2>Controlled adapters</h2></div></div><div class="tool-list"><button data-tool="readProduct">GET product record</button><button data-tool="validateProposal">Validate operation set</button><button data-tool="writeFields">PATCH allowed fields</button><button data-tool="verifyProduct">GET verify final state</button></div><div class="bo-guard"><strong>Permission boundary</strong><span>Only title, category, description and readiness are writable in this demo.</span></div></article>
+        </div>
+        <article class="card bo-console-card"><div class="card-head"><div><p>EXECUTION CONSOLE</p><h2>Tool trace</h2><button id="boRun" class="accent">Run approved flow</button></div><div id="boConsole" class="bo-console"><div><span>system</span><code>Waiting for an operator-approved proposal.</code></div></div></article>
+      </section>
+  </main>
+</div>
+<div id="tour" class="tour hidden" role="dialog" aria-modal="true" aria-labelledby="tourTitle">
+  <div class="tour-card"><div class="tour-progress"><span id="tourProgress"></span></div><p id="tourStep">STEP 1 OF 5</p><h2 id="tourTitle">Start with the operational queue</h2><div id="tourText">Select one synthetic product and inspect its current state.</div><div class="tour-actions"><button id="tourExit">Exit</button><button id="tourNext" class="accent">Next</button></div></div>
+</div>
+<div id="toast" class="toast"></div>
+<script type="module" src="./src/app.js?v=16"></script>
+<script type="module" src="./src/architecture-map.js?v=2"></script>
+</body>
+</html>
