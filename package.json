@@ -1,0 +1,9 @@
+{
+  "name": "agentic-ops-demo",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "start": "python -m http.server 8080"
+  }
+}

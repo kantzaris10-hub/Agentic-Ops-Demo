@@ -1,0 +1,2802 @@
+{
+  "meta": {
+    "name": "Felper",
+    "version": "1.1.0",
+    "root": "TPL - Forge",
+    "generated": "2026-08-19",
+    "summary": "Eleven traced workflows through Forge: inspect the components, follow each execution path, and review its checks and known failure modes.",
+    "description": "Forge is a Windows Electron desktop application used to prepare product content, images, properties and vehicle fitments, then execute operator-triggered actions in a Back Office system. The renderer manages input and review; the Electron main process owns browser automation, filesystem access and database reads. This implementation reference preserves the supplied component and workflow descriptions, with internal hostnames replaced by system roles.",
+    "scale": {
+      "app/app.js": 12842,
+      "main.js": 4641,
+      "app/styles.css": 4072,
+      "app/index.html": 1205,
+      "app/bo-fill.js": 1060,
+      "app/bo-verify.js": 415,
+      "app/bo-article-fill.js": 381,
+      "cdp-client.js": 354,
+      "app/auditor-checks.js": 207,
+      "app/bo-batch-payloads.js": 163,
+      "bo-db.js": 153,
+      "app/compat-matcher.js": 129,
+      "bo-auditor.js": 90,
+      "preload.js": 83,
+      "app/bo-shared.js": 34,
+      "bo-preload.js": 6
+    },
+    "invariants": [
+      "Titles must be POSTed one language per request. A batched array only ever persisted EN.",
+      "Nearly every write runs inside a the Back Office admin application page, because the session cookie only attaches from that origin.",
+      "openBoAndFill (DOM injection) is the only path that persists attributes. The attributes batch tool loops through it deliberately.",
+      "Injected scripts are IIFEs returning a Promise; the caller relies on awaitPromise. A non-async wrapper silently serialises to {} and makes every check pass.",
+      "setReactValue writes through the native prototype setter. Assigning el.value directly is invisible to React.",
+      "sleepNet is never scaled by speedFactor. The speed slider may only compress UI waits, never network floors."
+    ]
+  },
+  "contexts": [
+    {
+      "id": "renderer",
+      "label": "Renderer",
+      "swatch": "",
+      "description": "The Felper UI. Vanilla DOM in app/index.html + app/app.js. Reaches the main process only through window.felperElectron."
+    },
+    {
+      "id": "main",
+      "label": "Main process",
+      "swatch": "plate",
+      "description": "Node.js side. Owns every BrowserWindow, all Chrome automation, the SQL read layer and the filesystem."
+    },
+    {
+      "id": "injected",
+      "label": "Page context",
+      "swatch": "dashed",
+      "description": "Code that runs inside someone else's page — the Back Office admin application or the image management application — not in our renderer. Dashed because it is temporarily attached to a document we do not own."
+    },
+    {
+      "id": "external",
+      "label": "External",
+      "swatch": "ext",
+      "description": "Systems outside this codebase: the BO stack, real Chrome, SQL Server, supplier sites."
+    }
+  ],
+  "groups": [
+    {
+      "id": "g-renderer",
+      "label": "Renderer — app/app.js · 12,842 lines",
+      "x": 20,
+      "y": 50,
+      "w": 500,
+      "h": 860
+    },
+    {
+      "id": "g-preload",
+      "label": "Context bridge",
+      "x": 580,
+      "y": 50,
+      "w": 220,
+      "h": 460
+    },
+    {
+      "id": "g-main",
+      "label": "Main process — main.js · 4,641 lines",
+      "x": 860,
+      "y": 50,
+      "w": 220,
+      "h": 1310
+    },
+    {
+      "id": "g-windows",
+      "label": "Browser targets",
+      "x": 1160,
+      "y": 50,
+      "w": 220,
+      "h": 1130
+    },
+    {
+      "id": "g-injected",
+      "label": "Page-context code",
+      "x": 1460,
+      "y": 50,
+      "w": 220,
+      "h": 680
+    },
+    {
+      "id": "g-external",
+      "label": "External systems",
+      "x": 1760,
+      "y": 50,
+      "w": 220,
+      "h": 1130
+    }
+  ],
+  "nodes": [
+    {
+      "id": "ui-inputs",
+      "label": "Inputs tab",
+      "context": "renderer",
+      "kind": "ui",
+      "file": "app/index.html",
+      "line": 130,
+      "x": 40,
+      "y": 100,
+      "w": 180,
+      "h": 68,
+      "summary": "Product entry. Single mode takes a BO code and an AI-generated JSON reply; batch mode takes 2–20 rows or an Excel import, then previews and runs them.",
+      "tech": [
+        "single/batch",
+        "Excel import",
+        "AI prompt"
+      ]
+    },
+    {
+      "id": "ui-img",
+      "label": "IMG tab",
+      "context": "renderer",
+      "kind": "ui",
+      "file": "app/index.html",
+      "line": 358,
+      "x": 40,
+      "y": 190,
+      "w": 180,
+      "h": 68,
+      "summary": "Photo library plus the multi-source Image Importer: scrape, drag-drop, folder load, one photo to many codes, then upload and verify.",
+      "tech": [
+        "photo cards",
+        "importer",
+        "upload queue"
+      ]
+    },
+    {
+      "id": "ui-cms",
+      "label": "CMS tab",
+      "context": "renderer",
+      "kind": "ui",
+      "file": "app/index.html",
+      "line": 515,
+      "x": 40,
+      "y": 280,
+      "w": 180,
+      "h": 68,
+      "summary": "Generated titles, subtitles, descriptions and article HTML in six languages, plus the batch review navigator.",
+      "tech": [
+        "6 languages",
+        "copy cards"
+      ]
+    },
+    {
+      "id": "ui-props-cse",
+      "label": "Properties & CSE tabs",
+      "context": "renderer",
+      "kind": "ui",
+      "file": "app/index.html",
+      "line": 581,
+      "x": 40,
+      "y": 370,
+      "w": 180,
+      "h": 68,
+      "summary": "Physical specs and the five comparison-shopping channels (Skroutz, BestPrice, NexTag, Google, Linkwise), including a CSE batch runner.",
+      "tech": [
+        "5 CSE channels"
+      ]
+    },
+    {
+      "id": "ui-compat",
+      "label": "Compatibilities tab",
+      "context": "renderer",
+      "kind": "ui",
+      "file": "app/index.html",
+      "line": 640,
+      "x": 40,
+      "y": 460,
+      "w": 180,
+      "h": 68,
+      "summary": "Vehicle-fitment matching against a bundled read-only dictionary of several thousand rows, plus BO dimension display.",
+      "tech": [
+        "compat matcher"
+      ]
+    },
+    {
+      "id": "ui-bofinal",
+      "label": "BO Bind tab",
+      "context": "renderer",
+      "kind": "ui",
+      "file": "app/index.html",
+      "line": 699,
+      "x": 40,
+      "y": 550,
+      "w": 180,
+      "h": 68,
+      "summary": "The main fill trigger. '⚡ Fill Selected' runs the whole API pipeline; also holds bulk category binding and the section checkboxes.",
+      "tech": [
+        "Fill Selected",
+        "bulk bind"
+      ]
+    },
+    {
+      "id": "ui-edit",
+      "label": "EDIT tab",
+      "context": "renderer",
+      "kind": "ui",
+      "file": "app/index.html",
+      "line": 859,
+      "x": 40,
+      "y": 640,
+      "w": 180,
+      "h": 68,
+      "summary": "Patching live products, plus six one-off batch tools: dimensions, BLK filler, bind article, clone articles, category FAQ, attributes.",
+      "tech": [
+        "patch pipeline",
+        "6 batch tools"
+      ]
+    },
+    {
+      "id": "ui-auditor",
+      "label": "BO Auditor tab",
+      "context": "renderer",
+      "kind": "ui",
+      "file": "app/index.html",
+      "line": 1043,
+      "x": 40,
+      "y": 730,
+      "w": 180,
+      "h": 68,
+      "summary": "Read-only catalogue audit. Only check A1 (part-number / title integrity) is live; A2–A7 are disabled placeholders.",
+      "tech": [
+        "check A1 only"
+      ]
+    },
+    {
+      "id": "ui-history",
+      "label": "History & analytics",
+      "context": "renderer",
+      "kind": "ui",
+      "file": "app/index.html",
+      "line": 799,
+      "x": 40,
+      "y": 820,
+      "w": 180,
+      "h": 68,
+      "summary": "Per-day productivity log, archived days, batch dashboard and CSV export. Timed panels in single mode, batch panels in batch mode.",
+      "tech": [
+        "CSV export",
+        "section timing"
+      ]
+    },
+    {
+      "id": "app-state",
+      "label": "state object",
+      "context": "renderer",
+      "kind": "module",
+      "file": "app/app.js",
+      "line": 74,
+      "x": 320,
+      "y": 100,
+      "w": 180,
+      "h": 68,
+      "summary": "DEFAULT_STATE — one object holding mode, product fields, checklist, timers, history and the image library. Everything resets on load except PERSISTENT_FIELDS, so the app always opens blank and the BO code decides the mode.",
+      "tech": [
+        "structuredClone",
+        "PERSISTENT_FIELDS"
+      ]
+    },
+    {
+      "id": "img-proc",
+      "label": "Image processing",
+      "context": "renderer",
+      "kind": "module",
+      "file": "app/app.js",
+      "line": 3700,
+      "x": 320,
+      "y": 190,
+      "w": 180,
+      "h": 68,
+      "summary": "Canvas plus the vendored pica resampler: square-fit to a 900px content box on a 1000px canvas, flood-fill background to white, crop, and the square-position editor.",
+      "tech": [
+        "pica",
+        "canvas",
+        "JPEG q0.95"
+      ]
+    },
+    {
+      "id": "payload-builder",
+      "label": "collectBoPayload()",
+      "context": "renderer",
+      "kind": "module",
+      "file": "app/app.js",
+      "line": 8937,
+      "x": 320,
+      "y": 280,
+      "w": 180,
+      "h": 68,
+      "summary": "The canonical single-product payload: boCode, properties, cse, cms{titles,subtitles,descriptions}, articles, articleHtml, attributes, speedFactor. Callers add _sections, _isPatch, _isBatch and _expectedTitle.",
+      "tech": [
+        "payload contract"
+      ]
+    },
+    {
+      "id": "templates",
+      "label": "Templates & helpers",
+      "context": "renderer",
+      "kind": "module",
+      "file": "app/data/templates.js",
+      "line": 1,
+      "x": 320,
+      "y": 370,
+      "w": 180,
+      "h": 68,
+      "summary": "Per-mode title / description / subtitle templates, translations, CSE and attribute presets, BO category links. Selected by setup mode (oil, air, car, generic, batch).",
+      "tech": [
+        "5 setup modes"
+      ]
+    },
+    {
+      "id": "compat",
+      "label": "compat-matcher",
+      "context": "renderer",
+      "kind": "module",
+      "file": "app/compat-matcher.js",
+      "line": 1,
+      "x": 320,
+      "y": 460,
+      "w": 180,
+      "h": 68,
+      "summary": "Pure matching engine over a large minified compatibility dictionary — model key normalisation, engine and year extraction. Exposed as window.FelperCompat.",
+      "tech": [
+        "pure",
+        "unit-tested"
+      ]
+    },
+    {
+      "id": "batch-payloads",
+      "label": "bo-batch-payloads",
+      "context": "renderer",
+      "kind": "module",
+      "file": "app/bo-batch-payloads.js",
+      "line": 1,
+      "x": 320,
+      "y": 550,
+      "w": 180,
+      "h": 68,
+      "summary": "Pure builders and guards for Clone Articles and Category FAQ. The only module loaded by all three of the renderer, the main process and the test suite.",
+      "tech": [
+        "pure",
+        "dual export",
+        "tested"
+      ]
+    },
+    {
+      "id": "store-local",
+      "label": "localStorage",
+      "context": "renderer",
+      "kind": "store",
+      "file": "app/app.js",
+      "line": 187,
+      "x": 320,
+      "y": 640,
+      "w": 180,
+      "h": 68,
+      "summary": "Key oilFilterWorkflowHelperState holds the whole state object; a second key holds the last auditor run.",
+      "tech": [
+        "quota-guarded"
+      ]
+    },
+    {
+      "id": "store-idb",
+      "label": "IndexedDB",
+      "context": "renderer",
+      "kind": "store",
+      "file": "app/app.js",
+      "line": 189,
+      "x": 320,
+      "y": 730,
+      "w": 180,
+      "h": 68,
+      "summary": "Two databases: oilFilterWorkflowHelperImages (browser-path image bytes) and felperBatchDash (saved batch runs). In Electron, images are real files on disk referenced by path.",
+      "tech": [
+        "2 databases"
+      ]
+    },
+    {
+      "id": "preload",
+      "label": "window.felperElectron",
+      "context": "renderer",
+      "kind": "bridge",
+      "file": "preload.js",
+      "line": 3,
+      "x": 600,
+      "y": 280,
+      "w": 180,
+      "h": 68,
+      "summary": "The only door between renderer and main: contextBridge methods mapping to IPC channels, plus 8 progress-event subscriptions. Loaded solely by the main window.",
+      "tech": [
+        "contextIsolation",
+        "~58 methods"
+      ]
+    },
+    {
+      "id": "bo-preload",
+      "label": "window.felperBo",
+      "context": "renderer",
+      "kind": "bridge",
+      "file": "bo-preload.js",
+      "line": 3,
+      "x": 600,
+      "y": 430,
+      "w": 180,
+      "h": 68,
+      "summary": "A six-line second bridge injected into every BO window. Exposes only pressTab() and pressEnter(), because PrimeVue's auto-save needs a genuinely trusted key event.",
+      "tech": [
+        "2 methods"
+      ]
+    },
+    {
+      "id": "main-ipc",
+      "label": "IPC router",
+      "context": "main",
+      "kind": "process",
+      "file": "main.js",
+      "line": 222,
+      "x": 880,
+      "y": 100,
+      "w": 180,
+      "h": 68,
+      "summary": "The ipcMain handlers covering fills, photos, scrapers, batch tools, the auditor and file operations, plus 8 channels pushed back to the renderer.",
+      "tech": [
+        "~51 channels"
+      ]
+    },
+    {
+      "id": "erp-fetch",
+      "label": "ERP description fetch",
+      "context": "main",
+      "kind": "module",
+      "file": "main.js",
+      "line": 222,
+      "x": 880,
+      "y": 190,
+      "w": 180,
+      "h": 68,
+      "summary": "Three-level lookup that also drives automatic mode detection: 10-minute memory cache, then a learned API URL template, then a full page load with a fetch interceptor and a CDP network listener.",
+      "tech": [
+        "3 levels",
+        "template learning"
+      ]
+    },
+    {
+      "id": "fill-api",
+      "label": "fillCmsViaApi",
+      "context": "main",
+      "kind": "module",
+      "file": "main.js",
+      "line": 3276,
+      "x": 880,
+      "y": 280,
+      "w": 180,
+      "h": 68,
+      "summary": "The current default write path. One large inline script inside the authenticated BO page posts titles, descriptions, dimensions, attributes, properties, CSE binds and articles straight to the APIs — no DOM driving.",
+      "tech": [
+        "API pipeline",
+        "no DOM"
+      ]
+    },
+    {
+      "id": "fill-electron",
+      "label": "openBoAndFill",
+      "context": "main",
+      "kind": "module",
+      "file": "main.js",
+      "line": 3018,
+      "x": 880,
+      "y": 370,
+      "w": 180,
+      "h": 68,
+      "summary": "The DOM-injection path: opens the product page, runs guards, injects bo-fill.js, then follows the captured article URL into phase 2. Still the only path that persists attributes.",
+      "tech": [
+        "2 phases",
+        "guards"
+      ]
+    },
+    {
+      "id": "fill-chrome",
+      "label": "fillBoInChrome",
+      "context": "main",
+      "kind": "module",
+      "file": "main.js",
+      "line": 2900,
+      "x": 880,
+      "y": 460,
+      "w": 180,
+      "h": 68,
+      "summary": "Same phase-1 script, but executed in the operator's real Chrome over CDP. Kills any running Chrome first, because a live profile lock makes Chrome ignore --remote-debugging-port.",
+      "tech": [
+        "taskkill",
+        "no phase 2"
+      ]
+    },
+    {
+      "id": "verify-main",
+      "label": "openBoAndVerify",
+      "context": "main",
+      "kind": "module",
+      "file": "main.js",
+      "line": 3601,
+      "x": 880,
+      "y": 550,
+      "w": 180,
+      "h": 68,
+      "summary": "Read-only inverse of the fill: injects bo-verify.js, reads values back and returns an issue report. The async injection wrapper is load-bearing — a plain wrapper serialised the unresolved Promise and made everything falsely pass.",
+      "tech": [
+        "read-only",
+        "async wrapper"
+      ]
+    },
+    {
+      "id": "photos-main",
+      "label": "IMG Tool upload",
+      "context": "main",
+      "kind": "module",
+      "file": "main.js",
+      "line": 384,
+      "x": 880,
+      "y": 640,
+      "w": 180,
+      "h": 68,
+      "summary": "Two upload paths: a UI-driving one that opens the product and confirms identity from its store, and an API-fast one that reads the pUID from BO then posts images directly. Fast skips the already-has-photos guard.",
+      "tech": [
+        "UI + fast paths",
+        "identity guards"
+      ]
+    },
+    {
+      "id": "batch-ops",
+      "label": "Batch operations",
+      "context": "main",
+      "kind": "module",
+      "file": "main.js",
+      "line": 1498,
+      "x": 880,
+      "y": 730,
+      "w": 180,
+      "h": 68,
+      "summary": "Dimensions, BLK Sprint Boosters, bind article, clone articles, category FAQ and attributes. Each navigates once and loops in-page, streaming progress back per code.",
+      "tech": [
+        "8 channels",
+        "1 navigation"
+      ]
+    },
+    {
+      "id": "scrapers",
+      "label": "Supplier scrapers",
+      "context": "main",
+      "kind": "module",
+      "file": "main.js",
+      "line": 2488,
+      "x": 880,
+      "y": 820,
+      "w": 180,
+      "h": 68,
+      "summary": "InterCars and AutoDoc image discovery. Both refuse a loose match: short codes are rejected outright and the slug must contain a delimited, in-order token match — never just the first link.",
+      "tech": [
+        "2 sources",
+        "confident-match"
+      ]
+    },
+    {
+      "id": "bo-auditor",
+      "label": "bo-auditor",
+      "context": "main",
+      "kind": "module",
+      "file": "bo-auditor.js",
+      "line": 37,
+      "x": 880,
+      "y": 910,
+      "w": 180,
+      "h": 68,
+      "summary": "Orchestrates catalogue checks: pulls the product catalogue, derives a brand per product from part-number patterns, runs check A1 and streams progress.",
+      "tech": [
+        "cancellable"
+      ]
+    },
+    {
+      "id": "bo-db",
+      "label": "bo-db (read-only)",
+      "context": "main",
+      "kind": "module",
+      "file": "bo-db.js",
+      "line": 122,
+      "x": 880,
+      "y": 1000,
+      "w": 180,
+      "h": 68,
+      "summary": "The SQL layer, read-only by construction: readOnlyIntent, and assertReadOnly() rejects anything but a single SELECT or WITH, plus stacked statements. Credentials come only from process.env.",
+      "tech": [
+        "mssql",
+        "assertReadOnly"
+      ]
+    },
+    {
+      "id": "cdp-client",
+      "label": "cdp-client",
+      "context": "main",
+      "kind": "module",
+      "file": "cdp-client.js",
+      "line": 85,
+      "x": 880,
+      "y": 1090,
+      "w": 180,
+      "h": 68,
+      "summary": "A dependency-free CDP client that hand-rolls the WebSocket protocol over raw sockets. One socket per command. Rewrites localhost to 127.0.0.1 because Windows resolves localhost to ::1 while Chrome listens only on IPv4.",
+      "tech": [
+        "raw net",
+        "no deps"
+      ]
+    },
+    {
+      "id": "req-logger",
+      "label": "BO request logger",
+      "context": "main",
+      "kind": "module",
+      "file": "main.js",
+      "line": 3908,
+      "x": 880,
+      "y": 1180,
+      "w": 180,
+      "h": 68,
+      "summary": "webRequest observer on the BO session recording every POST, PUT and PATCH with up to 8 KB of body — the forensic trail behind every wrong-product guard in this codebase.",
+      "tech": [
+        "jsonl",
+        "8 KB bodies"
+      ]
+    },
+    {
+      "id": "fs-userdata",
+      "label": "userData files",
+      "context": "main",
+      "kind": "store",
+      "file": "main.js",
+      "line": 21,
+      "x": 880,
+      "y": 1270,
+      "w": 180,
+      "h": 68,
+      "summary": "%APPDATA%/felper — rolling 7-day state backups, photo and request logs, scrape cache, processed images, Dropbox cache, and original-image backups for revert. Pinned to the felper folder so data survived the rename.",
+      "tech": [
+        "7-day backups",
+        "jsonl logs"
+      ]
+    },
+    {
+      "id": "bo-fetch-window",
+      "label": "boFetchWindow (hidden)",
+      "context": "main",
+      "kind": "window",
+      "file": "main.js",
+      "line": 43,
+      "x": 1180,
+      "y": 190,
+      "w": 180,
+      "h": 68,
+      "summary": "A never-shown BrowserWindow on the BO session, used only to scrape ERP description, dimensions and vehicle type. Its CDP network listener must be attached before loadURL or it misses the response.",
+      "tech": [
+        "show:false",
+        "CDP Network"
+      ]
+    },
+    {
+      "id": "bo-window",
+      "label": "boWindow",
+      "context": "main",
+      "kind": "window",
+      "file": "main.js",
+      "line": 3026,
+      "x": 1180,
+      "y": 370,
+      "w": 180,
+      "h": 68,
+      "summary": "The visible workhorse. One module-level singleton reused by fourteen call sites, on partition persist:bo-session so the login survives. Broadcasts every navigation back to the renderer.",
+      "tech": [
+        "persist:bo-session",
+        "singleton"
+      ]
+    },
+    {
+      "id": "imgtool-window",
+      "label": "imgToolWindow",
+      "context": "main",
+      "kind": "window",
+      "file": "main.js",
+      "line": 367,
+      "x": 1180,
+      "y": 640,
+      "w": 180,
+      "h": 68,
+      "summary": "The IMG Tool automation window on its own session. Driven with real synthesised mouse events, because the autocomplete selects on mousedown and ignores element.click().",
+      "tech": [
+        "persist:imgtool-session",
+        "real mouse"
+      ]
+    },
+    {
+      "id": "scrape-windows",
+      "label": "Scrape windows",
+      "context": "main",
+      "kind": "window",
+      "file": "main.js",
+      "line": 2299,
+      "x": 1180,
+      "y": 820,
+      "w": 180,
+      "h": 68,
+      "summary": "One window per supplier, each on its own session. Shown with showInactive so they never steal focus but the operator can still solve a Cloudflare challenge.",
+      "tech": [
+        "showInactive",
+        "per-source session"
+      ]
+    },
+    {
+      "id": "chrome-real",
+      "label": "Real Chrome",
+      "context": "external",
+      "kind": "app",
+      "file": "main.js",
+      "line": 2929,
+      "x": 1180,
+      "y": 1090,
+      "w": 180,
+      "h": 68,
+      "summary": "The operator's own Chrome, relaunched against their real User Data directory with --remote-debugging-port=9222 so they are already logged in everywhere.",
+      "tech": [
+        "port 9222",
+        "real profile"
+      ]
+    },
+    {
+      "id": "inline-api",
+      "label": "Inline API scripts",
+      "context": "injected",
+      "kind": "script",
+      "file": "main.js",
+      "line": 3332,
+      "x": 1480,
+      "y": 280,
+      "w": 180,
+      "h": 68,
+      "summary": "Template-literal scripts authored in main.js and executed inside the BO page — the CMS pipeline and every batch tool. They run there, not in Node, because the session cookie only attaches from that origin.",
+      "tech": [
+        "same-origin",
+        "credentials:include"
+      ]
+    },
+    {
+      "id": "bo-shared",
+      "label": "bo-shared.js",
+      "context": "injected",
+      "kind": "script",
+      "file": "app/bo-shared.js",
+      "line": 1,
+      "x": 1480,
+      "y": 370,
+      "w": 180,
+      "h": 68,
+      "summary": "Helper prelude textually prepended inside the wrapper. Provides setReactValue, which uses the native prototype setter — assigning el.value directly is invisible to React.",
+      "tech": [
+        "setReactValue",
+        "not standalone"
+      ]
+    },
+    {
+      "id": "bo-fill",
+      "label": "bo-fill.js",
+      "context": "injected",
+      "kind": "script",
+      "file": "app/bo-fill.js",
+      "line": 1,
+      "x": 1480,
+      "y": 460,
+      "w": 180,
+      "h": 68,
+      "summary": "Phase 1: CMS, properties, CSE and attributes by driving the real React UI. Three sleep tiers, where the network tier is never scaled by speedFactor. Ends by capturing the article-edit URL.",
+      "tech": [
+        "7 phases",
+        "React fiber walk"
+      ]
+    },
+    {
+      "id": "bo-article-fill",
+      "label": "bo-article-fill.js",
+      "context": "injected",
+      "kind": "script",
+      "file": "app/bo-article-fill.js",
+      "line": 1,
+      "x": 1480,
+      "y": 550,
+      "w": 180,
+      "h": 68,
+      "summary": "Phase 2: writes the article body into TinyMCE once per language and saves, up to three attempts each. Saves by invoking the button's React onClick prop, which bypasses the disabled state.",
+      "tech": [
+        "6 languages",
+        "TinyMCE"
+      ]
+    },
+    {
+      "id": "bo-verify",
+      "label": "bo-verify.js",
+      "context": "injected",
+      "kind": "script",
+      "file": "app/bo-verify.js",
+      "line": 1,
+      "x": 1480,
+      "y": 640,
+      "w": 180,
+      "h": 68,
+      "summary": "The same traversal as bo-fill, but it clicks, reads and presses Escape instead of writing. Cross-checks identity by reading the Part No. from the BASIC INFO tab.",
+      "tech": [
+        "read-only"
+      ]
+    },
+    {
+      "id": "correlator",
+      "label": "correlator API",
+      "context": "external",
+      "kind": "api",
+      "file": "the product correlation API",
+      "line": null,
+      "x": 1780,
+      "y": 190,
+      "w": 180,
+      "h": 68,
+      "summary": "The main write API: titles, descriptions, attributes, properties, dimensions, CSE binds and category binds. Titles must be posted one language at a time — a batched array only ever persisted EN.",
+      "tech": [
+        "/api/backoffice"
+      ]
+    },
+    {
+      "id": "bo-agg",
+      "label": "bo-agg API",
+      "context": "external",
+      "kind": "api",
+      "file": "the Back Office aggregation service",
+      "line": null,
+      "x": 1780,
+      "y": 280,
+      "w": 180,
+      "h": 68,
+      "summary": "Article upsert, keyed by Code (language plus name) and pUID. One POST per article per language.",
+      "tech": [
+        "/api/product/articles"
+      ]
+    },
+    {
+      "id": "bo-site",
+      "label": "BO admin site",
+      "context": "external",
+      "kind": "app",
+      "file": "the Back Office admin application",
+      "line": null,
+      "x": 1780,
+      "y": 460,
+      "w": 180,
+      "h": 68,
+      "summary": "The React admin the whole app exists to fill. PrimeReact widgets, TinyMCE article editor, and auth by session cookie — which is why nearly every write runs inside one of its pages.",
+      "tech": [
+        "React",
+        "PrimeReact",
+        "TinyMCE"
+      ]
+    },
+    {
+      "id": "imgtool-site",
+      "label": "IMG Tool",
+      "context": "external",
+      "kind": "app",
+      "file": "the image management application",
+      "line": null,
+      "x": 1780,
+      "y": 640,
+      "w": 180,
+      "h": 68,
+      "summary": "The image pipeline. POST /resize/images twice per image — multipart upload, then a JSON record carrying uid, colour and the eight output sizes.",
+      "tech": [
+        "/resize/images",
+        "8 sizes"
+      ]
+    },
+    {
+      "id": "scrape-sites",
+      "label": "InterCars · AutoDoc",
+      "context": "external",
+      "kind": "app",
+      "file": "intercars24.ee · autodoc.co.uk",
+      "line": null,
+      "x": 1780,
+      "y": 820,
+      "w": 180,
+      "h": 68,
+      "summary": "Supplier catalogues scraped for product photos. AutoDoc images are upscaled by probing the CDN's size parameter and measuring naturalWidth in-page.",
+      "tech": [
+        "Cloudflare",
+        "CDN upscale"
+      ]
+    },
+    {
+      "id": "dnafilters",
+      "label": "e-dnafilters.gr",
+      "context": "external",
+      "kind": "app",
+      "file": "www.e-dnafilters.gr",
+      "line": null,
+      "x": 1780,
+      "y": 910,
+      "w": 180,
+      "h": 68,
+      "summary": "The public DNA storefront, scraped for the Greek 'Χρήση Φίλτρου' (filter use) value with up to three progressively shorter query variants.",
+      "tech": [
+        "Next.js scrape"
+      ]
+    },
+    {
+      "id": "mssql",
+      "label": "SQL Server",
+      "context": "external",
+      "kind": "store",
+      "file": "TPL_SiteData",
+      "line": null,
+      "x": 1780,
+      "y": 1000,
+      "w": 180,
+      "h": 68,
+      "summary": "Read from two tables, _erp_Products_Full and _Products_Title, joined in JavaScript rather than SQL to dodge a Greek/Latin1 collation conflict.",
+      "tech": [
+        "2 tables",
+        "JS-side join"
+      ]
+    },
+    {
+      "id": "dropbox",
+      "label": "Dropbox",
+      "context": "external",
+      "kind": "app",
+      "file": "main.js",
+      "line": 4163,
+      "x": 1780,
+      "y": 1090,
+      "w": 180,
+      "h": 68,
+      "summary": "Air supplier photo archives. The share link's browser-session token is stripped and dl=1 forced; the zip is extracted with PowerShell Expand-Archive.",
+      "tech": [
+        "zip",
+        "PowerShell"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-inputs-state",
+      "from": "ui-inputs",
+      "to": "app-state",
+      "label": "product fields",
+      "kind": "write",
+      "file": "app/app.js",
+      "line": 591,
+      "note": "The BO-code prefix also drives automatic mode selection."
+    },
+    {
+      "id": "e-state-ls",
+      "from": "app-state",
+      "to": "store-local",
+      "label": "save (400ms debounce)",
+      "kind": "write",
+      "file": "app/app.js",
+      "line": 1782
+    },
+    {
+      "id": "e-state-idb",
+      "from": "app-state",
+      "to": "store-idb",
+      "label": "images, batch runs",
+      "kind": "write",
+      "file": "app/app.js",
+      "line": 9899
+    },
+    {
+      "id": "e-tpl-cms",
+      "from": "templates",
+      "to": "ui-cms",
+      "label": "6-language copy",
+      "kind": "call",
+      "file": "app/app.js",
+      "line": 6284,
+      "note": "renderGeneratedOutputs() re-renders every grid from the parsed title."
+    },
+    {
+      "id": "e-cms-payload",
+      "from": "ui-cms",
+      "to": "payload-builder",
+      "label": "reads copy-cards",
+      "kind": "call",
+      "file": "app/app.js",
+      "line": 8980,
+      "note": "CMS values are read positionally out of the rendered textareas, then mapped to the language order."
+    },
+    {
+      "id": "e-img-proc",
+      "from": "ui-img",
+      "to": "img-proc",
+      "label": "fit · clean · crop",
+      "kind": "call",
+      "file": "app/app.js",
+      "line": 3867
+    },
+    {
+      "id": "e-compat-ui",
+      "from": "compat",
+      "to": "ui-compat",
+      "label": "vehicle matches",
+      "kind": "call",
+      "file": "app/app.js",
+      "line": 4722
+    },
+    {
+      "id": "e-bp-edit",
+      "from": "batch-payloads",
+      "to": "ui-edit",
+      "label": "parse + guard",
+      "kind": "call",
+      "file": "app/app.js",
+      "line": 9265
+    },
+    {
+      "id": "e-propscse-payload",
+      "from": "ui-props-cse",
+      "to": "payload-builder",
+      "label": "specs + 5 channels",
+      "kind": "call",
+      "file": "app/app.js",
+      "line": 8951,
+      "note": "Property rows differ by mode: air and car carry airflow figures, oil carries height and diameter."
+    },
+    {
+      "id": "e-history-idb",
+      "from": "ui-history",
+      "to": "store-idb",
+      "label": "load · resume runs",
+      "kind": "read",
+      "file": "app/app.js",
+      "line": 10101
+    },
+    {
+      "id": "e-payload-preload",
+      "from": "payload-builder",
+      "to": "preload",
+      "label": "payload",
+      "kind": "ipc",
+      "file": "app/app.js",
+      "line": 9474
+    },
+    {
+      "id": "e-cms-preload",
+      "from": "ui-cms",
+      "to": "preload",
+      "label": "fetchBoErpDesc",
+      "kind": "ipc",
+      "file": "app/app.js",
+      "line": 9675
+    },
+    {
+      "id": "e-img-preload",
+      "from": "ui-img",
+      "to": "preload",
+      "label": "upload · scrape · files",
+      "kind": "ipc",
+      "file": "app/app.js",
+      "line": 4366
+    },
+    {
+      "id": "e-inputs-preload",
+      "from": "ui-inputs",
+      "to": "preload",
+      "label": "batch run · verify",
+      "kind": "ipc",
+      "file": "app/app.js",
+      "line": 11043
+    },
+    {
+      "id": "e-bofinal-preload",
+      "from": "ui-bofinal",
+      "to": "preload",
+      "label": "fill · bulk bind",
+      "kind": "ipc",
+      "file": "app/app.js",
+      "line": 12076
+    },
+    {
+      "id": "e-edit-preload",
+      "from": "ui-edit",
+      "to": "preload",
+      "label": "6 batch tools",
+      "kind": "ipc",
+      "file": "app/app.js",
+      "line": 9145
+    },
+    {
+      "id": "e-auditor-preload",
+      "from": "ui-auditor",
+      "to": "preload",
+      "label": "auditorRun",
+      "kind": "ipc",
+      "file": "app/app.js",
+      "line": 12571
+    },
+    {
+      "id": "e-propscse-preload",
+      "from": "ui-props-cse",
+      "to": "preload",
+      "label": "CSE batch run",
+      "kind": "ipc",
+      "file": "app/app.js",
+      "line": 4968
+    },
+    {
+      "id": "e-preload-main",
+      "from": "preload",
+      "to": "main-ipc",
+      "label": "invoke · IPC channels",
+      "kind": "ipc",
+      "file": "preload.js",
+      "line": 3
+    },
+    {
+      "id": "e-batchops-preload",
+      "from": "batch-ops",
+      "to": "preload",
+      "label": "8 progress streams",
+      "kind": "ipc",
+      "file": "main.js",
+      "line": 1531,
+      "note": "Per-code progress pushed back so the renderer can render a live log."
+    },
+    {
+      "id": "e-bp-main",
+      "from": "batch-payloads",
+      "to": "main-ipc",
+      "label": "require() — same module",
+      "kind": "call",
+      "file": "main.js",
+      "line": 14,
+      "note": "The one module shared by renderer, main process and tests. Pure by design; the fetching lives in main.js."
+    },
+    {
+      "id": "e-ipc-erp",
+      "from": "main-ipc",
+      "to": "erp-fetch",
+      "label": "fetch-bo-erp-desc",
+      "kind": "call",
+      "file": "main.js",
+      "line": 222
+    },
+    {
+      "id": "e-ipc-fillapi",
+      "from": "main-ipc",
+      "to": "fill-api",
+      "label": "cms-fill-via-api",
+      "kind": "call",
+      "file": "main.js",
+      "line": 1387
+    },
+    {
+      "id": "e-ipc-fillel",
+      "from": "main-ipc",
+      "to": "fill-electron",
+      "label": "open-bo-and-fill",
+      "kind": "call",
+      "file": "main.js",
+      "line": 1383
+    },
+    {
+      "id": "e-ipc-fillchrome",
+      "from": "main-ipc",
+      "to": "fill-chrome",
+      "label": "fill-bo-in-chrome",
+      "kind": "call",
+      "file": "main.js",
+      "line": 2237
+    },
+    {
+      "id": "e-ipc-verify",
+      "from": "main-ipc",
+      "to": "verify-main",
+      "label": "verify-bo-product",
+      "kind": "call",
+      "file": "main.js",
+      "line": 2238
+    },
+    {
+      "id": "e-ipc-photos",
+      "from": "main-ipc",
+      "to": "photos-main",
+      "label": "upload-to-imgtool",
+      "kind": "call",
+      "file": "main.js",
+      "line": 384
+    },
+    {
+      "id": "e-ipc-batch",
+      "from": "main-ipc",
+      "to": "batch-ops",
+      "label": "8 batch channels",
+      "kind": "call",
+      "file": "main.js",
+      "line": 1498
+    },
+    {
+      "id": "e-ipc-scrape",
+      "from": "main-ipc",
+      "to": "scrapers",
+      "label": "find-images",
+      "kind": "call",
+      "file": "main.js",
+      "line": 2325
+    },
+    {
+      "id": "e-ipc-auditor",
+      "from": "main-ipc",
+      "to": "bo-auditor",
+      "label": "auditor-run",
+      "kind": "call",
+      "file": "main.js",
+      "line": 2102
+    },
+    {
+      "id": "e-ipc-dna",
+      "from": "main-ipc",
+      "to": "dnafilters",
+      "label": "fetch-filter-use",
+      "kind": "http",
+      "file": "main.js",
+      "line": 4342
+    },
+    {
+      "id": "e-ipc-dropbox",
+      "from": "main-ipc",
+      "to": "dropbox",
+      "label": "download zip",
+      "kind": "http",
+      "file": "main.js",
+      "line": 4038
+    },
+    {
+      "id": "e-erp-fetchwin",
+      "from": "erp-fetch",
+      "to": "bo-fetch-window",
+      "label": "hidden window",
+      "kind": "nav",
+      "file": "main.js",
+      "line": 43
+    },
+    {
+      "id": "e-fillapi-bo",
+      "from": "fill-api",
+      "to": "bo-window",
+      "label": "loadURL products/info",
+      "kind": "nav",
+      "file": "main.js",
+      "line": 3303
+    },
+    {
+      "id": "e-fillel-bo",
+      "from": "fill-electron",
+      "to": "bo-window",
+      "label": "loadURL + guards",
+      "kind": "nav",
+      "file": "main.js",
+      "line": 3055
+    },
+    {
+      "id": "e-verify-bo",
+      "from": "verify-main",
+      "to": "bo-window",
+      "label": "read-only pass",
+      "kind": "nav",
+      "file": "main.js",
+      "line": 3637
+    },
+    {
+      "id": "e-photos-bo",
+      "from": "photos-main",
+      "to": "bo-window",
+      "label": "read pUID first",
+      "kind": "read",
+      "file": "main.js",
+      "line": 1039
+    },
+    {
+      "id": "e-photos-img",
+      "from": "photos-main",
+      "to": "imgtool-window",
+      "label": "open / upload",
+      "kind": "nav",
+      "file": "main.js",
+      "line": 1045
+    },
+    {
+      "id": "e-batch-bo",
+      "from": "batch-ops",
+      "to": "bo-window",
+      "label": "one nav, many codes",
+      "kind": "nav",
+      "file": "main.js",
+      "line": 1522
+    },
+    {
+      "id": "e-scrape-win",
+      "from": "scrapers",
+      "to": "scrape-windows",
+      "label": "showInactive",
+      "kind": "nav",
+      "file": "main.js",
+      "line": 2309
+    },
+    {
+      "id": "e-fillchrome-cdp",
+      "from": "fill-chrome",
+      "to": "cdp-client",
+      "label": "cdpEvalAsync",
+      "kind": "call",
+      "file": "main.js",
+      "line": 2999,
+      "note": "awaitPromise:true — this is why every injected script returns a Promise."
+    },
+    {
+      "id": "e-fillchrome-chrome",
+      "from": "fill-chrome",
+      "to": "chrome-real",
+      "label": "taskkill + relaunch",
+      "kind": "spawn",
+      "file": "main.js",
+      "line": 2918
+    },
+    {
+      "id": "e-cdp-chrome",
+      "from": "cdp-client",
+      "to": "chrome-real",
+      "label": "WebSocket :9222",
+      "kind": "cdp",
+      "file": "cdp-client.js",
+      "line": 89
+    },
+    {
+      "id": "e-bo-inline",
+      "from": "bo-window",
+      "to": "inline-api",
+      "label": "executeJavaScript",
+      "kind": "inject",
+      "file": "main.js",
+      "line": 3332
+    },
+    {
+      "id": "e-bo-shared",
+      "from": "bo-window",
+      "to": "bo-shared",
+      "label": "prepended prelude",
+      "kind": "inject",
+      "file": "main.js",
+      "line": 3121
+    },
+    {
+      "id": "e-bo-fill",
+      "from": "bo-window",
+      "to": "bo-fill",
+      "label": "inject — phase 1",
+      "kind": "inject",
+      "file": "main.js",
+      "line": 3124
+    },
+    {
+      "id": "e-bo-article",
+      "from": "bo-window",
+      "to": "bo-article-fill",
+      "label": "inject — phase 2",
+      "kind": "inject",
+      "file": "main.js",
+      "line": 3784
+    },
+    {
+      "id": "e-bo-verify",
+      "from": "bo-window",
+      "to": "bo-verify",
+      "label": "inject — read-only",
+      "kind": "inject",
+      "file": "main.js",
+      "line": 3680
+    },
+    {
+      "id": "e-chrome-fill",
+      "from": "chrome-real",
+      "to": "bo-fill",
+      "label": "same script over CDP",
+      "kind": "inject",
+      "file": "main.js",
+      "line": 2998
+    },
+    {
+      "id": "e-fill-bosite",
+      "from": "bo-fill",
+      "to": "bo-site",
+      "label": "drives React DOM",
+      "kind": "call",
+      "file": "app/bo-fill.js",
+      "line": 257,
+      "note": "A Tab keydown is what triggers BO's own auto-save API — the script never calls fetch itself."
+    },
+    {
+      "id": "e-article-bosite",
+      "from": "bo-article-fill",
+      "to": "bo-site",
+      "label": "TinyMCE × 6",
+      "kind": "call",
+      "file": "app/bo-article-fill.js",
+      "line": 174
+    },
+    {
+      "id": "e-verify-bosite",
+      "from": "bo-verify",
+      "to": "bo-site",
+      "label": "reads values back",
+      "kind": "read",
+      "file": "app/bo-verify.js",
+      "line": 37
+    },
+    {
+      "id": "e-inline-corr",
+      "from": "inline-api",
+      "to": "correlator",
+      "label": "titles · descriptions · CSE",
+      "kind": "http",
+      "file": "main.js",
+      "line": 3343
+    },
+    {
+      "id": "e-inline-agg",
+      "from": "inline-api",
+      "to": "bo-agg",
+      "label": "article per language",
+      "kind": "http",
+      "file": "main.js",
+      "line": 3541
+    },
+    {
+      "id": "e-fill-bopreload",
+      "from": "bo-fill",
+      "to": "bo-preload",
+      "label": "felperBo.pressTab()",
+      "kind": "call",
+      "file": "bo-preload.js",
+      "line": 4,
+      "note": "The page asks the main process for a trusted key event, because a synthetic one does not trigger the auto-save."
+    },
+    {
+      "id": "e-bopreload-main",
+      "from": "bo-preload",
+      "to": "main-ipc",
+      "label": "bo-press-tab",
+      "kind": "ipc",
+      "file": "main.js",
+      "line": 2214
+    },
+    {
+      "id": "e-bowin-bosite",
+      "from": "bo-window",
+      "to": "bo-site",
+      "label": "persist:bo-session",
+      "kind": "nav",
+      "file": "main.js",
+      "line": 3023,
+      "note": "The partition is what keeps the operator logged in across runs."
+    },
+    {
+      "id": "e-fetchwin-bosite",
+      "from": "bo-fetch-window",
+      "to": "bo-site",
+      "label": "learns API template",
+      "kind": "nav",
+      "file": "main.js",
+      "line": 293
+    },
+    {
+      "id": "e-imgwin-site",
+      "from": "imgtool-window",
+      "to": "imgtool-site",
+      "label": "POST /resize/images",
+      "kind": "http",
+      "file": "main.js",
+      "line": 1071
+    },
+    {
+      "id": "e-imgwin-corr",
+      "from": "imgtool-window",
+      "to": "correlator",
+      "label": "alt_image by reference",
+      "kind": "http",
+      "file": "main.js",
+      "line": 983,
+      "note": "Variations reference existing CDN URLs rather than re-uploading, which would duplicate them into the general pool."
+    },
+    {
+      "id": "e-scrapewin-sites",
+      "from": "scrape-windows",
+      "to": "scrape-sites",
+      "label": "search + product pages",
+      "kind": "nav",
+      "file": "main.js",
+      "line": 2495
+    },
+    {
+      "id": "e-chrome-bosite",
+      "from": "chrome-real",
+      "to": "bo-site",
+      "label": "already logged in",
+      "kind": "nav",
+      "file": "main.js",
+      "line": 2930
+    },
+    {
+      "id": "e-auditor-db",
+      "from": "bo-auditor",
+      "to": "bo-db",
+      "label": "fetchProductCatalog()",
+      "kind": "call",
+      "file": "bo-auditor.js",
+      "line": 37
+    },
+    {
+      "id": "e-db-mssql",
+      "from": "bo-db",
+      "to": "mssql",
+      "label": "2 SELECTs · read-only",
+      "kind": "read",
+      "file": "bo-db.js",
+      "line": 122
+    },
+    {
+      "id": "e-photos-fs",
+      "from": "photos-main",
+      "to": "fs-userdata",
+      "label": "photo-upload-log",
+      "kind": "write",
+      "file": "main.js",
+      "line": 964
+    },
+    {
+      "id": "e-scrape-fs",
+      "from": "scrapers",
+      "to": "fs-userdata",
+      "label": "scrape-cache · processed",
+      "kind": "write",
+      "file": "main.js",
+      "line": 2335
+    },
+    {
+      "id": "e-verify-fs",
+      "from": "verify-main",
+      "to": "fs-userdata",
+      "label": "verify-debug.log",
+      "kind": "write",
+      "file": "main.js",
+      "line": 3599
+    },
+    {
+      "id": "e-reqlog-fs",
+      "from": "req-logger",
+      "to": "fs-userdata",
+      "label": "bo-request-log",
+      "kind": "write",
+      "file": "main.js",
+      "line": 3908
+    },
+    {
+      "id": "e-bowin-reqlog",
+      "from": "bo-window",
+      "to": "req-logger",
+      "label": "webRequest observer",
+      "kind": "read",
+      "file": "main.js",
+      "line": 3913
+    }
+  ],
+  "flows": [
+    {
+      "id": "f-fill-api",
+      "label": "Fill BO — API pipeline",
+      "entry": "⚡ Fill Selected",
+      "summary": "The current default write path. Everything goes through the correlator and bo-agg APIs from inside an authenticated page — no DOM driving at all.",
+      "steps": [
+        {
+          "n": 1,
+          "label": "Operator clicks ⚡ Fill Selected",
+          "node": "ui-bofinal",
+          "file": "app/app.js",
+          "line": 9436,
+          "detail": "fillViaApiAction(), also bound to every .fill-via-api-btn across the tabs."
+        },
+        {
+          "n": 2,
+          "label": "Renderer assembles the payload",
+          "node": "payload-builder",
+          "edge": "e-cms-payload",
+          "file": "app/app.js",
+          "line": 8937,
+          "detail": "Waits for any in-flight filter-use fetch first, then repacks into cms, articleHtml, properties, attributes and cse, gated by the section checkboxes."
+        },
+        {
+          "n": 3,
+          "label": "Crosses the context bridge",
+          "node": "preload",
+          "edge": "e-payload-preload",
+          "file": "preload.js",
+          "line": 17,
+          "detail": "felperElectron.cmsFillViaApi(boCode, data) — the renderer has no other way to reach Node."
+        },
+        {
+          "n": 4,
+          "label": "IPC router dispatches",
+          "node": "main-ipc",
+          "edge": "e-preload-main",
+          "file": "main.js",
+          "line": 1387
+        },
+        {
+          "n": 5,
+          "label": "fillCmsViaApi takes over",
+          "node": "fill-api",
+          "edge": "e-ipc-fillapi",
+          "file": "main.js",
+          "line": 3276
+        },
+        {
+          "n": 6,
+          "label": "BO product page opens",
+          "node": "bo-window",
+          "edge": "e-fillapi-bo",
+          "file": "main.js",
+          "line": 3303,
+          "detail": "Waits for a GUID-shaped input, which is how it knows the product UID has rendered."
+        },
+        {
+          "n": 7,
+          "label": "Identity guards run before any write",
+          "node": "bo-window",
+          "guard": true,
+          "file": "main.js",
+          "line": 3316,
+          "detail": "Patch payloads must match the URL and clear a 50% title-word threshold, or the fill aborts rather than overwrite the wrong product."
+        },
+        {
+          "n": 8,
+          "label": "One inline script runs inside the page",
+          "node": "inline-api",
+          "edge": "e-bo-inline",
+          "file": "main.js",
+          "line": 3332,
+          "detail": "It runs there, not in Node, because the session cookie only attaches from the the Back Office admin application origin."
+        },
+        {
+          "n": 9,
+          "label": "Writes hit the correlator API",
+          "node": "correlator",
+          "edge": "e-inline-corr",
+          "file": "main.js",
+          "line": 3343,
+          "detail": "Descriptions batch, but titles go one language per POST — a batched array only ever persisted EN."
+        },
+        {
+          "n": 10,
+          "label": "Articles upserted per language",
+          "node": "bo-agg",
+          "edge": "e-inline-agg",
+          "file": "main.js",
+          "line": 3541,
+          "detail": "Then shared DNA articles, cached per session from a reference product."
+        },
+        {
+          "n": 11,
+          "label": "Log rendered back in the UI",
+          "node": "ui-bofinal",
+          "file": "app/app.js",
+          "line": 9544,
+          "detail": "renderFillLog() — optionally followed by a category bind and a photo upload in the same run."
+        }
+      ],
+      "failureModes": [
+        {
+          "symptom": "{ needsLogin: true } and nothing is written",
+          "cause": "The persist:bo-session cookie expired, so the product URL redirected to the login page.",
+          "where": "main.js:3304",
+          "check": "Open any BO window and log in once. The session is shared by every window on that partition, so one login fixes all paths."
+        },
+        {
+          "symptom": "{ mismatch: true } — the fill refuses to run",
+          "cause": "The title-word guard found under 50% of the expected title words on the loaded page. Usually the BO code and the pasted content belong to different products.",
+          "where": "main.js:3316",
+          "check": "Confirm the bo_code in the JSON matches the product you meant. This guard exists because a live product was once overwritten."
+        },
+        {
+          "symptom": "Only EN titles land, other languages silently missing",
+          "cause": "Titles were posted as a batched array instead of one request per language.",
+          "where": "main.js:3396",
+          "check": "The per-language POST loop must stay a loop. Never 'optimise' it into a single batched call."
+        },
+        {
+          "symptom": "Titles or subtitles come back blank on one side",
+          "cause": "Only one of title/subtitle was supplied for a language, and the live re-read of the CMS tab failed, so posting would have blanked the other side.",
+          "where": "main.js:3389",
+          "check": "The code deliberately skips the POST in this case. Supply both sides, or check that the CMS Setup tab rendered."
+        },
+        {
+          "symptom": "Attributes appear unchanged after a successful run",
+          "cause": "The API path does write attributes, but keyword/video edits made only in the UI cards are not in the payload unless the Attributes checkbox is ticked.",
+          "where": "app/app.js:9459",
+          "check": "Tick Attributes in the Advanced panel, or use the EDIT tab attributes batch tool, which routes through the DOM path."
+        }
+      ]
+    },
+    {
+      "id": "f-fill-dom",
+      "label": "Fill BO — DOM injection",
+      "entry": "openBoAndFill",
+      "summary": "The older path that drives the real React UI. Still the only route that persists attributes, so the attributes batch tool loops through it deliberately.",
+      "steps": [
+        {
+          "n": 1,
+          "label": "Batch or retry action fires",
+          "node": "ui-inputs",
+          "file": "app/app.js",
+          "line": 11043,
+          "detail": "Also reached from Retry Last Fill, the CSE batch, the EDIT patch runner and the batch-CMS navigator."
+        },
+        {
+          "n": 2,
+          "label": "Payload gains its section allowlist",
+          "node": "payload-builder",
+          "file": "app/app.js",
+          "line": 9068,
+          "detail": "_sections decides which of cms, properties, cse, attributes and articleCreate run."
+        },
+        {
+          "n": 3,
+          "label": "IPC open-bo-and-fill",
+          "node": "main-ipc",
+          "edge": "e-preload-main",
+          "file": "main.js",
+          "line": 1383
+        },
+        {
+          "n": 4,
+          "label": "openBoAndFill opens the product",
+          "node": "fill-electron",
+          "edge": "e-ipc-fillel",
+          "file": "main.js",
+          "line": 3018
+        },
+        {
+          "n": 5,
+          "label": "Window loads and clears four guards",
+          "node": "bo-window",
+          "edge": "e-fillel-bo",
+          "guard": true,
+          "file": "main.js",
+          "line": 3067,
+          "detail": "Title-word match, login redirect, URL identity, then a wait for the React tab list to exist."
+        },
+        {
+          "n": 6,
+          "label": "Prelude prepended",
+          "node": "bo-shared",
+          "edge": "e-bo-shared",
+          "file": "main.js",
+          "line": 3121,
+          "detail": "setReactValue writes through the native prototype setter — assigning el.value directly is invisible to React."
+        },
+        {
+          "n": 7,
+          "label": "bo-fill.js injected and awaited",
+          "node": "bo-fill",
+          "edge": "e-bo-fill",
+          "file": "main.js",
+          "line": 3124,
+          "detail": "The script is an IIFE returning a Promise; the caller relies on awaitPromise."
+        },
+        {
+          "n": 8,
+          "label": "It drives the real UI",
+          "node": "bo-site",
+          "edge": "e-fill-bosite",
+          "file": "app/bo-fill.js",
+          "line": 257,
+          "detail": "Fills a cell, then sends Tab — BO's own keydown handler is what saves."
+        },
+        {
+          "n": 9,
+          "label": "Trusted keys come back through IPC",
+          "node": "bo-preload",
+          "edge": "e-fill-bopreload",
+          "file": "bo-preload.js",
+          "line": 4,
+          "detail": "A synthetic key event does not satisfy PrimeVue, so the page asks the main process to send a real one."
+        },
+        {
+          "n": 10,
+          "label": "Article URL captured, phase 2 follows",
+          "node": "bo-article-fill",
+          "edge": "e-bo-article",
+          "file": "app/bo-fill.js",
+          "line": 149,
+          "detail": "window.open, pushState and replaceState are monkey-patched to capture the URL without spawning a tab, then all three are restored."
+        }
+      ],
+      "failureModes": [
+        {
+          "symptom": "Fill finishes instantly with filled: 0",
+          "cause": "The React tab list never appeared within 15s, so no section could be located.",
+          "where": "main.js:3100",
+          "check": "The BO page is slow or partially rendered. Reload the product page manually and retry."
+        },
+        {
+          "symptom": "Some values are typed but not saved",
+          "cause": "The Tab keydown that triggers BO's auto-save did not register as trusted.",
+          "where": "app/bo-fill.js:257",
+          "check": "Confirm bo-preload.js is still set as the window's preload — felperBo.pressTab() is what makes the key event real."
+        },
+        {
+          "symptom": "Dropdown picks the wrong item",
+          "cause": "The dropdown filter only engages above six items, and the search term is truncated to the first three alphanumerics (K&N becomes K).",
+          "where": "app/bo-fill.js:537",
+          "check": "Verify the intended option against the match ladder before assuming the value was wrong in the payload."
+        },
+        {
+          "symptom": "Everything is slower or flakier after changing the speed slider",
+          "cause": "speedFactor scales the micro and UI sleeps only. If a network wait was scaled by mistake, requests get cut off.",
+          "where": "app/bo-fill.js:12",
+          "check": "sleepNet must stay unscaled. Never multiply it by speedFactor."
+        },
+        {
+          "symptom": "A second browser tab opens during the fill",
+          "cause": "The window.open monkey-patch was not restored, or an exception skipped the restore.",
+          "where": "app/bo-fill.js:172",
+          "check": "window.open, pushState and replaceState must all be restored on every exit path."
+        }
+      ]
+    },
+    {
+      "id": "f-article",
+      "label": "Phase 2 — article in 6 languages",
+      "entry": "fillArticlesPhase2",
+      "summary": "Writes the article body into TinyMCE once per language. The trickiest injection in the codebase, and the one with the most defensive machinery.",
+      "steps": [
+        {
+          "n": 1,
+          "label": "Phase 1 returns an articleEditUrl",
+          "node": "bo-fill",
+          "file": "app/bo-fill.js",
+          "line": 187,
+          "detail": "Captured from the '+ New Article' button without letting a real tab open."
+        },
+        {
+          "n": 2,
+          "label": "Same window navigates to the editor",
+          "node": "bo-window",
+          "edge": "e-bo-article",
+          "file": "main.js",
+          "line": 3724,
+          "detail": "Relative URL resolved against the Back Office admin application; login redirects detected explicitly."
+        },
+        {
+          "n": 3,
+          "label": "Waits for TinyMCE to truly initialise",
+          "node": "bo-window",
+          "guard": true,
+          "file": "main.js",
+          "line": 3749,
+          "detail": "Polls up to 30s for #Name, the editor container and activeEditor.initialized — three conditions, because any one alone lies."
+        },
+        {
+          "n": 4,
+          "label": "bo-article-fill.js injected in an async wrapper",
+          "node": "bo-article-fill",
+          "file": "main.js",
+          "line": 3784,
+          "detail": "bo-shared is deliberately not prepended here; this script inlines its own setters."
+        },
+        {
+          "n": 5,
+          "label": "Language switched via React onClick",
+          "node": "bo-site",
+          "edge": "e-article-bosite",
+          "file": "app/bo-article-fill.js",
+          "line": 131,
+          "detail": "A plain .click() does not update the controlled dropdown state, so the prop is invoked directly."
+        },
+        {
+          "n": 6,
+          "label": "Editor reinitialises, script waits again",
+          "node": "bo-article-fill",
+          "guard": true,
+          "file": "app/bo-article-fill.js",
+          "line": 144,
+          "detail": "BO replaces the TinyMCE instance on every language switch."
+        },
+        {
+          "n": 7,
+          "label": "Content set, then saved past the disabled state",
+          "node": "bo-site",
+          "file": "app/bo-article-fill.js",
+          "line": 354,
+          "detail": "The Save button's React onClick is called directly, which bypasses the disabled attribute entirely."
+        },
+        {
+          "n": 8,
+          "label": "Whole phase races a 120s hard timeout",
+          "node": "fill-electron",
+          "guard": true,
+          "file": "main.js",
+          "line": 3809,
+          "detail": "did-navigate-in-page is deliberately not used as the completion signal — BO fires it on every language switch, which would resolve after one language."
+        }
+      ],
+      "failureModes": [
+        {
+          "symptom": "Only the EN article is written, the rest are missing",
+          "cause": "Completion was signalled by a navigation event that BO fires on the first language switch.",
+          "where": "main.js:3803",
+          "check": "The phase must be bounded by the injected script's own Promise plus the 120s race — never by did-navigate-in-page."
+        },
+        {
+          "symptom": "Article body is empty but the save succeeded",
+          "cause": "TinyMCE was replaced after the language switch and setContent hit the stale editor instance.",
+          "where": "app/bo-article-fill.js:144",
+          "check": "The 15s reinit poll must complete before writing. Confirm activeEditor.initialized is true."
+        },
+        {
+          "symptom": "Save button stays greyed out and nothing persists",
+          "cause": "The button is React-controlled; removing the disabled attribute alone does not fire the handler.",
+          "where": "app/bo-article-fill.js:354",
+          "check": "Save via the __reactProps onClick path. The DOM-click fallback is only a last resort."
+        },
+        {
+          "symptom": "Phase 2 never starts",
+          "cause": "Phase 1 did not capture an articleEditUrl, so there was nothing to navigate to.",
+          "where": "app/bo-fill.js:149",
+          "check": "The '+ New Article' button must exist on the CMS tab, and the articleCreate section must be enabled in _sections."
+        }
+      ]
+    },
+    {
+      "id": "f-erp",
+      "label": "ERP description lookup",
+      "entry": "fetch-bo-erp-desc",
+      "summary": "Three escalating levels behind a single call. Level 3 teaches the app the API URL template, which promotes every later code to level 2 — roughly 200ms instead of a full page load.",
+      "steps": [
+        {
+          "n": 1,
+          "label": "Operator types a BO code",
+          "node": "ui-cms",
+          "file": "app/app.js",
+          "line": 591,
+          "detail": "Debounced 400ms; the prefix alone already picks oil or generic mode."
+        },
+        {
+          "n": 2,
+          "label": "IPC fetch-bo-erp-desc",
+          "node": "main-ipc",
+          "edge": "e-cms-preload",
+          "file": "preload.js",
+          "line": 51
+        },
+        {
+          "n": 3,
+          "label": "Level 1 — 10-minute memory cache",
+          "node": "erp-fetch",
+          "edge": "e-ipc-erp",
+          "file": "main.js",
+          "line": 228,
+          "detail": "Returns instantly with no window and no network."
+        },
+        {
+          "n": 4,
+          "label": "Level 2 — learned API template",
+          "node": "bo-fetch-window",
+          "edge": "e-erp-fetchwin",
+          "file": "main.js",
+          "line": 239,
+          "detail": "One fetch inside the already-authenticated hidden window. On a miss the template is invalidated and it falls through."
+        },
+        {
+          "n": 5,
+          "label": "Level 3 — CDP listener attached first",
+          "node": "bo-fetch-window",
+          "guard": true,
+          "file": "main.js",
+          "line": 262,
+          "detail": "It must be attached before loadURL, or the dimensions response has already gone by."
+        },
+        {
+          "n": 6,
+          "label": "Page loads with window.fetch monkey-patched",
+          "node": "bo-site",
+          "edge": "e-fetchwin-bosite",
+          "file": "main.js",
+          "line": 293,
+          "detail": "Every response is cloned and searched for a key matching /^erp.?desc/i; a DOM TreeWalker is the fallback."
+        },
+        {
+          "n": 7,
+          "label": "The API URL is turned into a template",
+          "node": "erp-fetch",
+          "file": "main.js",
+          "line": 349,
+          "detail": "The code is replaced with a placeholder — this single line is what makes every subsequent lookup fast."
+        },
+        {
+          "n": 8,
+          "label": "Result drives automatic mode selection",
+          "node": "ui-cms",
+          "file": "app/app.js",
+          "line": 9711,
+          "detail": "detectModeFromErpDesc picks oil, air or car; a vehicleType of car upgrades air to car; unclassifiable falls back to generic."
+        }
+      ],
+      "failureModes": [
+        {
+          "symptom": "'ERP Description not found — make sure you are logged in to BO'",
+          "cause": "Neither the fetch interceptor nor the DOM fallback found a description within 15s.",
+          "where": "main.js:338",
+          "check": "Log in to BO once in any window. If already logged in, the product may genuinely have no ERP description."
+        },
+        {
+          "symptom": "Dimensions are missing but the description arrives",
+          "cause": "The dimensions race timed out at 5s, so the description is returned without them by design.",
+          "where": "main.js:341",
+          "check": "Expected on a slow response. Re-running the lookup usually fills dimensions from the cache."
+        },
+        {
+          "symptom": "Every lookup is slow again after being fast",
+          "cause": "The learned API template was invalidated by a miss and the app fell back to level 3 page loads.",
+          "where": "main.js:251",
+          "check": "One successful level-3 load relearns the template. Persistent slowness means the BO API URL shape changed."
+        },
+        {
+          "symptom": "The mode switches to the wrong product family",
+          "cause": "detectModeFromErpDesc classified the description differently, or vehicleType upgraded air to car.",
+          "where": "app/app.js:7373",
+          "check": "Set the mode manually. Batch mode is never auto-left."
+        }
+      ]
+    },
+    {
+      "id": "f-chrome",
+      "label": "Fill via the operator's real Chrome",
+      "entry": "fillBoInChrome",
+      "summary": "The same phase-1 script, executed in the operator's own browser over CDP. Exists because their real profile is already logged in everywhere.",
+      "steps": [
+        {
+          "n": 1,
+          "label": "Renderer requests the Chrome path",
+          "node": "ui-bofinal",
+          "file": "preload.js",
+          "line": 48,
+          "detail": "Currently unreferenced from the UI — the button was re-pointed at the API pipeline."
+        },
+        {
+          "n": 2,
+          "label": "Probe ports 9222–9225",
+          "node": "fill-chrome",
+          "edge": "e-ipc-fillchrome",
+          "file": "main.js",
+          "line": 2903
+        },
+        {
+          "n": 3,
+          "label": "Kill Chrome if it is running without the port",
+          "node": "chrome-real",
+          "edge": "e-fillchrome-chrome",
+          "file": "main.js",
+          "line": 2918,
+          "detail": "A live profile lock makes Chrome silently ignore --remote-debugging-port, so there is no gentler option."
+        },
+        {
+          "n": 4,
+          "label": "Relaunch against the real User Data directory",
+          "node": "chrome-real",
+          "file": "main.js",
+          "line": 2929,
+          "detail": "Polls the port for up to 20 seconds."
+        },
+        {
+          "n": 5,
+          "label": "Find or open the product tab",
+          "node": "cdp-client",
+          "edge": "e-fillchrome-cdp",
+          "file": "cdp-client.js",
+          "line": 246
+        },
+        {
+          "n": 6,
+          "label": "Connect over a hand-rolled WebSocket",
+          "node": "chrome-real",
+          "edge": "e-cdp-chrome",
+          "guard": true,
+          "file": "cdp-client.js",
+          "line": 89,
+          "detail": "The URL is rewritten from localhost to 127.0.0.1: Windows resolves localhost to ::1, but Chrome listens only on IPv4."
+        },
+        {
+          "n": 7,
+          "label": "Same script, evaluated with awaitPromise",
+          "node": "bo-fill",
+          "edge": "e-chrome-fill",
+          "file": "main.js",
+          "line": 2998,
+          "detail": "Five-minute timeout. There is no phase 2 on this path — articles are not filled."
+        },
+        {
+          "n": 8,
+          "label": "Script drives the page",
+          "node": "bo-site",
+          "edge": "e-fill-bosite",
+          "file": "app/bo-fill.js",
+          "line": 71
+        }
+      ],
+      "failureModes": [
+        {
+          "symptom": "'Chrome is already running without remote debugging'",
+          "cause": "launchChromeForBo refuses to kill Chrome; only fillBoInChrome does that.",
+          "where": "main.js:2875",
+          "check": "Close Chrome completely, including background tasks, then retry."
+        },
+        {
+          "symptom": "CDP call timeout on every command",
+          "cause": "The WebSocket URL resolved to IPv6 ::1 while Chrome listens only on IPv4.",
+          "where": "cdp-client.js:89",
+          "check": "The localhost to 127.0.0.1 rewrite must stay. Removing it breaks CDP on Windows entirely."
+        },
+        {
+          "symptom": "Fill works but articles are never written",
+          "cause": "This transport has no phase 2 by design.",
+          "where": "main.js:2998",
+          "check": "Use the Electron window path or the API pipeline when articles are needed."
+        },
+        {
+          "symptom": "Chrome reopens with a fresh, logged-out profile",
+          "cause": "The --user-data-dir argument did not resolve to the operator's real profile.",
+          "where": "main.js:2926",
+          "check": "Confirm %LOCALAPPDATA%/Google/Chrome/User Data exists. The whole point of this path is the existing login."
+        }
+      ]
+    },
+    {
+      "id": "f-photos-fast",
+      "label": "Photo upload — fast API path",
+      "entry": "upload-to-imgtool-api-fast",
+      "summary": "Skips opening the product in IMG Tool entirely. Faster, but that also means the already-has-photos guard cannot apply — so the identity guards before it carry all the weight.",
+      "steps": [
+        {
+          "n": 1,
+          "label": "Operator starts the upload queue",
+          "node": "ui-img",
+          "edge": "e-img-preload",
+          "file": "app/app.js",
+          "line": 4366,
+          "detail": "The queue is pausable and resumable; a login failure halts it while preserving the position."
+        },
+        {
+          "n": 2,
+          "label": "BO product page opened to read the UID",
+          "node": "bo-window",
+          "edge": "e-photos-bo",
+          "file": "main.js",
+          "line": 1013
+        },
+        {
+          "n": 3,
+          "label": "Two identity guards before anything is written",
+          "node": "bo-window",
+          "guard": true,
+          "file": "main.js",
+          "line": 1021,
+          "detail": "The loaded URL must still contain the code, and the page text plus every input value must contain it too. Both were added after a live product was overwritten."
+        },
+        {
+          "n": 4,
+          "label": "Product UID read from the GUID-shaped input",
+          "node": "photos-main",
+          "file": "main.js",
+          "line": 1039
+        },
+        {
+          "n": 5,
+          "label": "IMG Tool window opened",
+          "node": "imgtool-window",
+          "edge": "e-photos-img",
+          "file": "main.js",
+          "line": 1045
+        },
+        {
+          "n": 6,
+          "label": "Each image posted twice",
+          "node": "imgtool-site",
+          "edge": "e-imgwin-site",
+          "file": "main.js",
+          "line": 1071,
+          "detail": "A multipart upload, then a JSON record carrying uid, colour and eight output sizes. Colour encodes whether it is a base main, a base alt, or a series variation."
+        },
+        {
+          "n": 7,
+          "label": "Series variations get a main image each",
+          "node": "imgtool-site",
+          "file": "main.js",
+          "line": 1099,
+          "detail": "The dimension list comes from the correlator, keyed by Dim1."
+        },
+        {
+          "n": 8,
+          "label": "Variation alts assigned by reference",
+          "node": "correlator",
+          "edge": "e-imgwin-corr",
+          "file": "main.js",
+          "line": 983,
+          "detail": "Existing CDN URLs are referenced rather than re-uploaded — re-uploading would duplicate them into the general pool."
+        },
+        {
+          "n": 9,
+          "label": "Upload logged to disk",
+          "node": "fs-userdata",
+          "edge": "e-photos-fs",
+          "file": "main.js",
+          "line": 964
+        }
+      ],
+      "failureModes": [
+        {
+          "symptom": "abort-url-mismatch or abort-page-mismatch in the log",
+          "cause": "The loaded BO page no longer matched the requested code, so the upload refused to continue.",
+          "where": "main.js:1021",
+          "check": "This guard is working as intended. Re-run the single code and watch which product actually loads."
+        },
+        {
+          "symptom": "Photos overwrote a product that already had them",
+          "cause": "The fast path never opens the product in IMG Tool, so the already-has-photos guard cannot run.",
+          "where": "main.js:1000",
+          "check": "Use the normal (non-fast) upload when overwriting is a risk. Fast is for known-empty products."
+        },
+        {
+          "symptom": "Variation photos duplicated into the general pool",
+          "cause": "Variation alts were re-uploaded through the resize endpoint instead of referenced by existing CDN URL.",
+          "where": "main.js:983",
+          "check": "Variation alts must be assigned by reference with colour set to Dim1."
+        },
+        {
+          "symptom": "Queue stops partway with needsLogin",
+          "cause": "The IMG Tool or BO session expired mid-run.",
+          "where": "app/app.js:4377",
+          "check": "Log in, then press Continue — the queue position was preserved, so completed products are not redone."
+        }
+      ]
+    },
+    {
+      "id": "f-scrape",
+      "label": "Scrape → process → upload photos",
+      "entry": "Image Importer",
+      "summary": "Finding product photos on supplier sites, squaring and cleaning them locally, then pushing them into IMG Tool. The match logic is deliberately strict.",
+      "steps": [
+        {
+          "n": 1,
+          "label": "Operator picks a source and pastes code pairs",
+          "node": "ui-img",
+          "file": "app/app.js",
+          "line": 4124,
+          "detail": "BO code and supplier code per line, with a jittered 3–7 second throttle between products."
+        },
+        {
+          "n": 2,
+          "label": "Scraper searches the supplier",
+          "node": "scrapers",
+          "edge": "e-ipc-scrape",
+          "file": "main.js",
+          "line": 2488
+        },
+        {
+          "n": 3,
+          "label": "A window opens without stealing focus",
+          "node": "scrape-windows",
+          "edge": "e-scrape-win",
+          "file": "main.js",
+          "line": 2309,
+          "detail": "showInactive, so the operator can still solve a Cloudflare challenge by hand."
+        },
+        {
+          "n": 4,
+          "label": "Confident match, or nothing",
+          "node": "scrape-sites",
+          "edge": "e-scrapewin-sites",
+          "guard": true,
+          "file": "main.js",
+          "line": 2549,
+          "detail": "Codes under four alphanumerics are rejected, and the slug must contain a delimited in-order token match. It never falls back to the first link."
+        },
+        {
+          "n": 5,
+          "label": "Images downloaded with the source's own Referer",
+          "node": "fs-userdata",
+          "edge": "e-scrape-fs",
+          "file": "main.js",
+          "line": 2335,
+          "detail": "AutoDoc images are upscaled by probing the CDN size parameter and measuring naturalWidth in-page."
+        },
+        {
+          "n": 6,
+          "label": "Squared and cleaned locally",
+          "node": "img-proc",
+          "edge": "e-img-proc",
+          "file": "app/app.js",
+          "line": 3957,
+          "detail": "pica resample to a 1000px canvas with a 900px content box, flood-fill background to white, JPEG at quality 0.95."
+        },
+        {
+          "n": 7,
+          "label": "Written per product code",
+          "node": "fs-userdata",
+          "file": "main.js",
+          "line": 2373
+        },
+        {
+          "n": 8,
+          "label": "Uploaded, then verified and repaired",
+          "node": "imgtool-site",
+          "edge": "e-imgwin-site",
+          "file": "app/app.js",
+          "line": 4443,
+          "detail": "A separate read-only verify pass counts mains and alts, and the fix pass re-uploads only the shortfall."
+        }
+      ],
+      "failureModes": [
+        {
+          "symptom": "status 'rejected' and no images for a code",
+          "cause": "The supplier slug did not clear the confident-match test, or the code was under four alphanumerics.",
+          "where": "main.js:2549",
+          "check": "Intentional. Find the product manually and use the single-code lookup or drag the photos in."
+        },
+        {
+          "symptom": "Every product returns nothing, suddenly",
+          "cause": "A Cloudflare challenge is blocking the scrape window.",
+          "where": "main.js:2309",
+          "check": "The window is visible but never focused — bring it up and solve the challenge, then resume."
+        },
+        {
+          "symptom": "AutoDoc images are low resolution",
+          "cause": "The upscale probe fell back to the thumbnail because no larger variant measured bigger.",
+          "where": "main.js:2631",
+          "check": "Expected for some products. Verify against the source page before assuming a bug."
+        },
+        {
+          "symptom": "status 'manual_check'",
+          "cause": "Images were found and saved, but the main image did not meet the expected pixel size.",
+          "where": "app/app.js:3978",
+          "check": "Open the code in the importer, inspect the frames, and fix or re-fetch from another source."
+        }
+      ]
+    },
+    {
+      "id": "f-batch",
+      "label": "Batch CMS run",
+      "entry": "batch mode",
+      "summary": "The high-volume path: many products from one Excel or AI-generated JSON, run in sequence with live progress and a resumable saved record.",
+      "steps": [
+        {
+          "n": 1,
+          "label": "Switch to batch mode",
+          "node": "ui-inputs",
+          "file": "app/app.js",
+          "line": 1818,
+          "detail": "The mode sets a data attribute on body; CSS does the rest. The title field and mode toggle physically relocate."
+        },
+        {
+          "n": 2,
+          "label": "Rows entered, imported, or pasted as JSON",
+          "node": "ui-inputs",
+          "file": "app/app.js",
+          "line": 10871,
+          "detail": "Excel parsing is hand-rolled — zip reading, inflate via DecompressionStream, XML parse. No library."
+        },
+        {
+          "n": 3,
+          "label": "Validated and seeded into a saved run",
+          "node": "store-idb",
+          "edge": "e-state-idb",
+          "file": "app/app.js",
+          "line": 9954,
+          "detail": "The batch dashboard record lives in IndexedDB; only a light index sits in localStorage."
+        },
+        {
+          "n": 4,
+          "label": "Reviewed product by product in the CMS tab",
+          "node": "ui-cms",
+          "file": "app/app.js",
+          "line": 10486,
+          "detail": "A navigator replaces the normal copy-card grids in batch mode."
+        },
+        {
+          "n": 5,
+          "label": "Run all, via API or via injection",
+          "node": "main-ipc",
+          "edge": "e-inputs-preload",
+          "file": "app/app.js",
+          "line": 11151
+        },
+        {
+          "n": 6,
+          "label": "Each product filled in turn",
+          "node": "fill-api",
+          "edge": "e-ipc-fillapi",
+          "file": "main.js",
+          "line": 3276,
+          "detail": "_isBatch suppresses the title-mismatch guard, since batch titles are supplied rather than derived."
+        },
+        {
+          "n": 7,
+          "label": "Every step reported into the dashboard",
+          "node": "store-idb",
+          "file": "app/app.js",
+          "line": 9984,
+          "detail": "dashMark() is the universal report-in hook — CMS, CSE, images and bind all funnel through it."
+        },
+        {
+          "n": 8,
+          "label": "Verified, then repaired",
+          "node": "verify-main",
+          "edge": "e-ipc-verify",
+          "file": "app/app.js",
+          "line": 11277,
+          "detail": "The fix pass re-fills and re-verifies in place, moving products between the issue and clean lists live."
+        },
+        {
+          "n": 9,
+          "label": "Resumable from History",
+          "node": "ui-history",
+          "edge": "e-history-idb",
+          "file": "app/app.js",
+          "line": 10101,
+          "detail": "Loading a saved run and resuming skips products whose CMS is already marked done."
+        }
+      ],
+      "failureModes": [
+        {
+          "symptom": "A wrong product got filled during a batch",
+          "cause": "_isBatch suppresses the title-word guard, because batch titles are supplied rather than derived from the page.",
+          "where": "main.js:3067",
+          "check": "The bo_code column is the only identity check in batch mode. Validate the sheet before running, not after."
+        },
+        {
+          "symptom": "Run stops early with no error",
+          "cause": "The stop flag was set, or a product returned needsLogin which halts the loop.",
+          "where": "app/app.js:11151",
+          "check": "Check the results log for the last code, log in, then resume from History — completed products are skipped."
+        },
+        {
+          "symptom": "Excel import produces zero products",
+          "cause": "The sheet matched neither the tall nor the wide layout.",
+          "where": "app/app.js:10727",
+          "check": "Download the template and compare headers. The parser is hand-rolled and header-driven."
+        },
+        {
+          "symptom": "Progress looks stalled on one code",
+          "cause": "A single fill is waiting on a network floor or a 45s page-load timeout.",
+          "where": "main.js:3055",
+          "check": "Expected for slow products. The live ETA accounts for it; only intervene if it exceeds the timeout."
+        }
+      ]
+    },
+    {
+      "id": "f-edit",
+      "label": "EDIT tab batch tools",
+      "entry": "Clone Articles · Category FAQ",
+      "summary": "Six one-off tools that write across many products. The FAQ writer is the most dangerous, because a category extras write replaces the whole record.",
+      "steps": [
+        {
+          "n": 1,
+          "label": "Operator pastes a spec or FAQ array",
+          "node": "ui-edit",
+          "file": "app/index.html",
+          "line": 908,
+          "detail": "Clone Articles takes {from, to, names[]}; Category FAQ takes [{iso, question, answer}]."
+        },
+        {
+          "n": 2,
+          "label": "A pure module parses and guards it",
+          "node": "batch-payloads",
+          "edge": "e-bp-edit",
+          "guard": true,
+          "file": "app/bo-batch-payloads.js",
+          "line": 31,
+          "detail": "parseCloneSpec refuses a spec where from equals to, because that would overwrite the source."
+        },
+        {
+          "n": 3,
+          "label": "Preview first — dry run writes nothing",
+          "node": "ui-edit",
+          "file": "app/app.js",
+          "line": 9256,
+          "detail": "Both tools have a preview mode that reports what would change, including whether the target already exists."
+        },
+        {
+          "n": 4,
+          "label": "IPC into the batch handlers",
+          "node": "main-ipc",
+          "edge": "e-edit-preload",
+          "file": "app/app.js",
+          "line": 9145
+        },
+        {
+          "n": 5,
+          "label": "The same pure module is required in main",
+          "node": "batch-payloads",
+          "edge": "e-bp-main",
+          "file": "main.js",
+          "line": 14,
+          "detail": "One module, three consumers: renderer, main process and the test suite. That is why its guards cannot drift."
+        },
+        {
+          "n": 6,
+          "label": "One navigation, then in-page fetches",
+          "node": "bo-window",
+          "edge": "e-batch-bo",
+          "file": "main.js",
+          "line": 1522,
+          "detail": "Navigate once to establish the session origin, then loop over every code without renavigating."
+        },
+        {
+          "n": 7,
+          "label": "Optimistic-concurrency guard on FAQ write",
+          "node": "inline-api",
+          "edge": "e-bo-inline",
+          "guard": true,
+          "file": "app/bo-batch-payloads.js",
+          "line": 117,
+          "detail": "The write is refused if the FAQ count or the EN question of the target slot has drifted since it was loaded."
+        },
+        {
+          "n": 8,
+          "label": "Rows posted, then read back and diffed",
+          "node": "correlator",
+          "edge": "e-inline-corr",
+          "file": "main.js",
+          "line": 1893,
+          "detail": "After writing, the whole extras record is re-read and compared so collateral damage to other slots is visible."
+        }
+      ],
+      "failureModes": [
+        {
+          "symptom": "'that would overwrite the source' on a clone",
+          "cause": "The from and to prefixes are identical.",
+          "where": "app/bo-batch-payloads.js:31",
+          "check": "Working as intended. Give the clone a distinct target prefix."
+        },
+        {
+          "symptom": "FAQ write refused with a count or question mismatch",
+          "cause": "The category's extras record changed between Load and Write.",
+          "where": "app/bo-batch-payloads.js:122",
+          "check": "Press Load again to refresh the slots, then re-apply. Never bypass this guard — the write replaces the entire record."
+        },
+        {
+          "symptom": "Other FAQ slots changed after a write",
+          "cause": "The whole extras record is replaced on write, so a stale in-memory copy silently reverts siblings.",
+          "where": "main.js:1893",
+          "check": "Read the post-write diff in the log. It exists precisely to surface this."
+        },
+        {
+          "symptom": "'TARGET EXISTS' and nothing is written",
+          "cause": "The destination article already exists and overwrite was not set in the spec.",
+          "where": "main.js:1813",
+          "check": "Confirm you mean to replace it, then add overwrite to the spec."
+        }
+      ]
+    },
+    {
+      "id": "f-verify",
+      "label": "Verify and fix",
+      "entry": "verify-bo-product",
+      "summary": "Reads live BO values back and compares them to what should be there. Independent of the fill path by design, so a bug can only misreport, never overwrite.",
+      "steps": [
+        {
+          "n": 1,
+          "label": "Verify all pressed",
+          "node": "ui-inputs",
+          "file": "app/app.js",
+          "line": 11218
+        },
+        {
+          "n": 2,
+          "label": "Debug log cleared first",
+          "node": "fs-userdata",
+          "edge": "e-verify-fs",
+          "file": "main.js",
+          "line": 2240
+        },
+        {
+          "n": 3,
+          "label": "Product page loaded read-only",
+          "node": "bo-window",
+          "edge": "e-verify-bo",
+          "file": "main.js",
+          "line": 3637
+        },
+        {
+          "n": 4,
+          "label": "bo-verify.js injected in an async wrapper",
+          "node": "bo-verify",
+          "edge": "e-bo-verify",
+          "guard": true,
+          "file": "main.js",
+          "line": 3665,
+          "detail": "The async wrapper is load-bearing: a plain one serialised the unresolved Promise to an empty object and made every check falsely pass."
+        },
+        {
+          "n": 5,
+          "label": "Values clicked, read, and escaped",
+          "node": "bo-site",
+          "edge": "e-verify-bosite",
+          "file": "app/bo-verify.js",
+          "line": 37,
+          "detail": "Same traversal as the fill, but Escape instead of Tab, so nothing is committed."
+        },
+        {
+          "n": 6,
+          "label": "Identity cross-checked from BASIC INFO",
+          "node": "bo-verify",
+          "guard": true,
+          "file": "app/bo-verify.js",
+          "line": 45,
+          "detail": "Reads the Part No. independently of the URL."
+        },
+        {
+          "n": 7,
+          "label": "Report written and rendered",
+          "node": "fs-userdata",
+          "file": "main.js",
+          "line": 3692
+        },
+        {
+          "n": 8,
+          "label": "Fix pass re-fills only what failed",
+          "node": "fill-electron",
+          "edge": "e-ipc-fillel",
+          "file": "app/app.js",
+          "line": 11401
+        }
+      ],
+      "failureModes": [
+        {
+          "symptom": "Everything passes, including things you know are wrong",
+          "cause": "The injected verify script resolved to an empty object because its wrapper was not async.",
+          "where": "main.js:3661",
+          "check": "The classic failure here. The wrapper must be async and must await the inner Promise."
+        },
+        {
+          "symptom": "Verify reports issues that are actually correct",
+          "cause": "Expected values came from the payload, not the page, so formatting differences read as mismatches.",
+          "where": "app/app.js:11263",
+          "check": "Compare against the live page before running a fix pass. Verify can misreport but never writes."
+        },
+        {
+          "symptom": "Report window is empty or stale",
+          "cause": "verify-report.html is overwritten each run and verify-debug.log is truncatable.",
+          "where": "main.js:2240",
+          "check": "Re-run the verify. Neither artefact is a durable ledger."
+        }
+      ]
+    },
+    {
+      "id": "f-auditor",
+      "label": "BO Auditor — read-only SQL",
+      "entry": "auditor-run",
+      "summary": "The newest subsystem and the only one that touches the database. Read-only by construction, and the renderer never sees SQL or credentials.",
+      "steps": [
+        {
+          "n": 1,
+          "label": "Connection probed",
+          "node": "ui-auditor",
+          "edge": "e-auditor-preload",
+          "file": "app/app.js",
+          "line": 12544,
+          "detail": "A trivial SELECT 1, so a misconfiguration surfaces before a long run."
+        },
+        {
+          "n": 2,
+          "label": "Run requested with checks and brand filter",
+          "node": "main-ipc",
+          "edge": "e-preload-main",
+          "file": "main.js",
+          "line": 2102,
+          "detail": "A re-entrancy guard prevents two concurrent audits."
+        },
+        {
+          "n": 3,
+          "label": "Auditor pulls the catalogue",
+          "node": "bo-auditor",
+          "edge": "e-ipc-auditor",
+          "file": "bo-auditor.js",
+          "line": 37
+        },
+        {
+          "n": 4,
+          "label": "Two SELECTs, joined in JavaScript",
+          "node": "mssql",
+          "edge": "e-db-mssql",
+          "file": "bo-db.js",
+          "line": 122,
+          "detail": "Joined in JS rather than SQL to dodge a Greek/Latin1 collation conflict between the two tables."
+        },
+        {
+          "n": 5,
+          "label": "Read-only enforced in code, not just by intent",
+          "node": "bo-db",
+          "edge": "e-auditor-db",
+          "guard": true,
+          "file": "bo-db.js",
+          "line": 76,
+          "detail": "readOnlyIntent on the connection, and assertReadOnly rejects anything that is not a single SELECT or WITH, including stacked statements."
+        },
+        {
+          "n": 6,
+          "label": "Brand derived per product, then check A1 runs",
+          "node": "bo-auditor",
+          "file": "bo-auditor.js",
+          "line": 52,
+          "detail": "A1 is part-number and title integrity — corruption, neighbour-copy, foreign part numbers. A2 through A7 are placeholders."
+        },
+        {
+          "n": 7,
+          "label": "Progress streamed to the UI",
+          "node": "ui-auditor",
+          "edge": "e-batchops-preload",
+          "file": "main.js",
+          "line": 2106
+        },
+        {
+          "n": 8,
+          "label": "Findings filtered, sorted, exported",
+          "node": "store-local",
+          "edge": "e-state-ls",
+          "file": "app/app.js",
+          "line": 12667,
+          "detail": "The table caps at 2,000 DOM rows; CSV export carries the full set."
+        }
+      ],
+      "failureModes": [
+        {
+          "symptom": "Probe fails with a connection error",
+          "cause": "MSSQL_* environment variables are missing or the .env file was not loaded.",
+          "where": "bo-db.js:15",
+          "check": "Credentials come only from process.env in the main process. The renderer never has them."
+        },
+        {
+          "symptom": "A query is rejected before it runs",
+          "cause": "assertReadOnly refused it — not a single SELECT or WITH, or it contained stacked statements.",
+          "where": "bo-db.js:76",
+          "check": "Working as intended. This layer is read-only by construction and must stay that way."
+        },
+        {
+          "symptom": "Results look truncated",
+          "cause": "The table renders at most 2,000 DOM rows.",
+          "where": "app/app.js:12667",
+          "check": "Export the CSV — it carries every finding."
+        },
+        {
+          "symptom": "Only check A1 is available",
+          "cause": "A2 through A7 are disabled placeholders in the UI.",
+          "where": "app/index.html:1072",
+          "check": "Expected. The auditor is a scaffold with one implemented check."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+[
+  {
+    "sku": "DEMO-1042",
+    "brand": "Northwind",
+    "source": "Synthetic supplier feed",
+    "title": "NW filter 1042",
+    "category": null,
+    "attributes": {"material": "cotton", "reusable": true},
+    "description": null,
+    "image": true,
+    "marketplaceReady": false
+  },
+  {
+    "sku": "DEMO-2048",
+    "brand": "Contoso",
+    "source": "Synthetic supplier feed",
+    "title": "Contoso Universal Filter",
+    "category": null,
+    "attributes": {"material": null, "reusable": null},
+    "description": null,
+    "image": false,
+    "marketplaceReady": false,
+    "conflict": "Supplier data does not contain enough evidence to choose a category safely."
+  }
+]
